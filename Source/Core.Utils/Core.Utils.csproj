@@ -66,27 +66,17 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>if $(ConfigurationName) == Release (
-
-xcopy /q /y "$(TargetDir)*$(TargetName).*" "$(SolutionDir)..\Deployment\Bin" 1&gt;nul
-
-"$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetPath)" 1&gt;nul
-
+  xcopy /q /y "$(TargetDir)*$(TargetName).*" "$(SolutionDir)..\Deployment\Bin" 1&gt;nul
+  "$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetPath)" 1&gt;nul
 )
-
 
 if $(ConfigurationName) == Debug (
-
-xcopy /q /y "$(TargetDir)*$(TargetName).*" "$(SolutionDir)..\Deployment\Debug" 1&gt;nul
-
-"$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetPath)" 1&gt;nul
-
+  xcopy /q /y "$(TargetDir)*$(TargetName).*" "$(SolutionDir)..\Deployment\Debug" 1&gt;nul
+  "$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetPath)" 1&gt;nul
 )
 
-
 if $(ConfigurationName) == DebugNoGac (
-
-xcopy /q /y "$(TargetDir)*$(TargetName).*" "$(SolutionDir)..\Deployment\Debug" 1&gt;nul
-
+  xcopy /q /y "$(TargetDir)*$(TargetName).*" "$(SolutionDir)..\Deployment\Debug" 1&gt;nul
 )</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

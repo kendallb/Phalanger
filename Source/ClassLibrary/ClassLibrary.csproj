@@ -315,8 +315,8 @@
   <PropertyGroup>
     <PreBuildEvent>
     </PreBuildEvent>
-    <PostBuildEvent>REM ECHO Uninstalling previous version from GAC ...
-REM "$(SolutionDir)..\Tools\gacutil" /u $(TargetName) 1&gt;nul
+    <PostBuildEvent>ECHO Uninstalling previous version from GAC ...
+"$(SolutionDir)..\Tools\gacutil" /u $(TargetName) 1&gt;nul
 
 REM ECHO Generating publisher policy assembly ...
 REM "$(SolutionDir)..\Tools\PolicyFileGen" "$(TargetPath)" "/out:$(TargetDir)policy.$(TargetName).config" 1&gt;nul
@@ -324,27 +324,29 @@ REM "$(SolutionDir)..\Tools\al" "/link:$(TargetDir)policy.$(TargetName).config" 
 
 ECHO Copying output to the Deployment folder ...
 if $(ConfigurationName) == Release (
-"$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetPath)" 1&gt;nul
-REM "$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetDir)policy.3.0.$(TargetFileName)" 1&gt;nul
-xcopy /q /y "$(TargetDir)*$(TargetName).dll" "$(SolutionDir)..\Deployment\Bin" 1&gt;nul
+  "$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetPath)" 1&gt;nul
+  REM "$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetDir)policy.3.0.$(TargetFileName)" 1&gt;nul
+  xcopy /q /y "$(TargetDir)*$(TargetName).dll" "$(SolutionDir)..\Deployment\Bin" 1&gt;nul
 
-REM mkdir "$(SolutionDir)..\Deployment\Bin\Temp"
-REM "$(SolutionDir)..\Deployment\Bin\MkDynamic" "$(SolutionDir)..\Deployment\Bin\$(TargetName).dll" "$(SolutionDir)..\Deployment\Bin\Temp"
-REM "$(SolutionDir)..\Tools\ilmerge" /ndebug /keyfile:"$(ProjectDir)ClassLibrary.snk" /out:"$(SolutionDir)..\Deployment\Bin\Temp\$(TargetFileName)" "$(TargetPath)" REM "$(SolutionDir)..\Deployment\Bin\Temp\$(TargetName).dynamic.dll"
-REM del "$(SolutionDir)..\Deployment\Bin\$(TargetName).dll"
-REM del "$(SolutionDir)..\Deployment\Bin\Temp\$(TargetName).dynamic.dll"
-REM move "$(SolutionDir)..\Deployment\Bin\Temp\$(TargetName).dll" "$(SolutionDir)..\Deployment\Bin"
-REM rmdir "$(SolutionDir)..\Deployment\Bin\Temp"
+  REM mkdir "$(SolutionDir)..\Deployment\Bin\Temp"
+  REM "$(SolutionDir)..\Deployment\Bin\MkDynamic" "$(SolutionDir)..\Deployment\Bin\$(TargetName).dll" "$(SolutionDir)..\Deployment\Bin\Temp"
+  REM "$(SolutionDir)..\Tools\ilmerge" /ndebug /keyfile:"$(ProjectDir)ClassLibrary.snk" /out:"$(SolutionDir)..\Deployment\Bin\Temp\$(TargetFileName)" "$(TargetPath)" REM "$(SolutionDir)..\Deployment\Bin\Temp\$(TargetName).dynamic.dll"
+  REM del "$(SolutionDir)..\Deployment\Bin\$(TargetName).dll"
+  REM del "$(SolutionDir)..\Deployment\Bin\Temp\$(TargetName).dynamic.dll"
+  REM move "$(SolutionDir)..\Deployment\Bin\Temp\$(TargetName).dll" "$(SolutionDir)..\Deployment\Bin"
+  REM rmdir "$(SolutionDir)..\Deployment\Bin\Temp"
 
-rem "$(SolutionDir)..\Deployment\Bin\PhpVerify" "$(TargetFileName)"
+  rem "$(SolutionDir)..\Deployment\Bin\PhpVerify" "$(TargetFileName)"
 )
+
 if $(ConfigurationName) == Debug (
-"$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetPath)" 1&gt;nul
-REM "$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetDir)policy.3.0.$(TargetFileName)" 1&gt;nul
-xcopy /q /y "$(TargetDir)*$(TargetName).*" "$(SolutionDir)..\Deployment\Debug" 1&gt;nul
+  "$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetPath)" 1&gt;nul
+  REM "$(SolutionDir)..\Tools\gacutil" -f -i "$(TargetDir)policy.3.0.$(TargetFileName)" 1&gt;nul
+  xcopy /q /y "$(TargetDir)*$(TargetName).*" "$(SolutionDir)..\Deployment\Debug" 1&gt;nul
 )
-if $(ConfigurationName) == DebugNoGac (
-xcopy /q /y "$(TargetDir)$(TargetName).*" "$(SolutionDir)..\Deployment\Debug" 1&gt;nul
+
+  if $(ConfigurationName) == DebugNoGac (
+  xcopy /q /y "$(TargetDir)$(TargetName).*" "$(SolutionDir)..\Deployment\Debug" 1&gt;nul
 )</PostBuildEvent>
   </PropertyGroup>
 </Project>
