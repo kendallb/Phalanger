@@ -2132,7 +2132,6 @@ namespace PHP.Core
         /// <param name="routine">A routine to be called.</param>
         /// <param name="data">Data passed to the routine.</param>
         /// <param name="allowUserExceptions">Whether user exceptions are allowed to be thrown by the target.</param>
-        /// <exception cref="PhpNetInternalException">Internal error.</exception>
         internal TResult GuardedCall<TData, TResult>(Converter<TData, TResult> routine, TData data, bool allowUserExceptions)
         {
             Library.SPL.Exception user_exception = null;
@@ -2169,10 +2168,6 @@ namespace PHP.Core
             catch (PhpUserException e)
             {
                 user_exception = e.UserException;
-            }
-            catch (Exception e)
-            {
-                throw new PhpNetInternalException("Guarded call", e);
             }
             finally
             {
@@ -2356,7 +2351,6 @@ namespace PHP.Core
         /// <exception cref="PhpException">An error occured during execution of the callbacks.</exception>
         /// <exception cref="PhpUserException">Uncaught exception has been raised by some callback.</exception>
         /// <exception cref="ScriptDiedException">Script died or exited.</exception>
-        /// <exception cref="PhpNetInternalException">Internal error.</exception>
         public object ProcessShutdownCallbacks(object _)
         {
             if (shutdownCallbacks != null)

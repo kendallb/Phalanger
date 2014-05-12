@@ -134,7 +134,6 @@ namespace PHP.Core
 		/// <param name="context">The reference to web server objects.</param>
 		/// <exception cref="System.Configuration.ConfigurationErrorsException">The configuration is invalid.</exception>
 		/// <exception cref="PhpUserException">Uncaught exception.</exception>
-		/// <exception cref="PhpNetInternalException">An internal error.</exception>
 		/// <exception cref="Exception">Uncaught exception thrown by the class library or another error occurred during request processing.</exception>
 		public void ProcessRequest(HttpContext/*!*/ context)
 		{
