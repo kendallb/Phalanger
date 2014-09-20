@@ -153,6 +153,8 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %token T_ENDFOR
 %token T_FOREACH
 %token T_ENDFOREACH
+%token T_DECLARE
+%token T_ENDDECLARE
 %token T_AS
 %token T_SWITCH
 %token T_ENDSWITCH
@@ -256,7 +258,6 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %token T_WAKEUP  
 %token T_SLEEP  
 %token T_AUTOLOAD
-%token T_ASSERT
 
 %token T_PARTIAL
 %token T_LGENERIC
@@ -319,7 +320,6 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %type<Object> ref_opt_identifier					  // Tuple<bool,string>!	// <is_ref, func_name>
 %type<Object> class_entry_type						  // Tuple<Tokens, PHPDocBlock>	// T_CLASS|T_TRAIT, PHPDocBlock
 %type<Object> class_declaration_statement             // TypeDecl
-%type<Object> class_identifier                        // String
 %type<Object> namespace_declaration_statement         // NamespaceDecl
 %type<Object> global_constant_declarator              // GlobalConstantDecl
 %type<Object> global_constant_declarator_list         // List<GlobalConstantDecl>
@@ -361,6 +361,7 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %type<Object> heredoc_expr							  // Expression
 %type<Object> for_statement                           // Statement
 %type<Object> foreach_statement                       // Statement
+%type<Object> declare_statement                       // Statement
 %type<Object> while_statement                         // Statement
 %type<Object> elseif_list_opt                         // List<ConditionalStmt>
 %type<Object> elseif_colon_list_opt                   // List<ConditionalStmt>
@@ -400,8 +401,8 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %type<Object> type_ref                                // TypeRef!
 %type<Object> type_ref_list                           // List<TypeRef>
 %type<Object> qualified_static_type_ref               // GenericQualifiedName
-%type<Object> interface_list                          // List<KeyValuePair<GenericQualifiedName,Text.Span>>
-%type<Object> interface_extends_opt                  // List<KeyValuePair<GenericQualifiedName,Text.Span>>
+%type<Object> interface_list                          // List<Tuple<GenericQualifiedName,Text.Span>>
+%type<Object> interface_extends_opt                  // List<Tuple<GenericQualifiedName,Text.Span>>
 %type<Object> variable_name                           
 
 %type<Object> generic_dynamic_args_opt                // List<TypeRef>!
@@ -439,7 +440,6 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %type<Object> class_constant_declarator_list          // List<ClassConstantDecl>!
 %type<Object> class_statement_list_opt
 %type<Object> class_statement
-%type<Object> class_method_identifier				  // String
 %type<Object> implements_opt 
 %type<Object> ctor_arguments_opt
 
@@ -576,6 +576,8 @@ namespace_declaration_statement:   /* PHP 5.3 */
 		{
 			currentNamespace.Statements = (List<Statement>)$4;
 			currentNamespace.UpdatePosition(@$);
+
+			reductionsSink.NamespaceDeclReduced(this, currentNamespace);
 			$$ = currentNamespace;
 			currentNamespace = null;
 		}
@@ -588,6 +590,8 @@ namespace_declaration_statement:   /* PHP 5.3 */
 		{
 			currentNamespace.Statements = (List<Statement>)$5;
 			currentNamespace.UpdatePosition(@$);
+			
+			reductionsSink.NamespaceDeclReduced(this, currentNamespace);
 			$$ = currentNamespace;
 			currentNamespace = null;
 		}
@@ -595,6 +599,7 @@ namespace_declaration_statement:   /* PHP 5.3 */
 	|	T_NAMESPACE namespace_name_list ';'
 		{ 
 			$$ = currentNamespace = new NamespaceDecl(@$, (List<string>)$2, true);
+			reductionsSink.NamespaceDeclReduced(this, currentNamespace);
 			currentNamespace.Statements = new List<Statement>();
 		}		
 ;
@@ -658,7 +663,7 @@ class_entry_type:
 
 class_declaration_statement:
 		attributes_opt visibility_opt modifier_opt partial_opt class_entry_type
-		class_identifier type_parameter_list_opt
+		identifier type_parameter_list_opt
 		{
 			Name class_name = new Name((string)$6);
 
@@ -677,12 +682,12 @@ class_declaration_statement:
 			member_attr |= PhpMemberAttributes.Trait | PhpMemberAttributes.Abstract;
 		  
 		  CheckReservedNamesAbsence((Tuple<GenericQualifiedName,Text.Span>)$9);
-		  CheckReservedNamesAbsence((List<KeyValuePair<GenericQualifiedName,Text.Span>>)$10);
+		  CheckReservedNamesAbsence((List<Tuple<GenericQualifiedName,Text.Span>>)$10);
 		  
 		  $$ = new TypeDecl(sourceUnit, CombinePositions(@5, @6), @$, GetHeadingEnd(GetLeftValidPosition(10)), GetBodyStart(@11), 
 				IsCurrentCodeConditional, GetScope(), 
 				member_attr, $4 != 0, class_name, @6, currentNamespace, 
-				(List<FormalTypeParam>)$7, (Tuple<GenericQualifiedName,Text.Span>)$9, (List<KeyValuePair<GenericQualifiedName,Text.Span>>)$10, 
+				(List<FormalTypeParam>)$7, (Tuple<GenericQualifiedName,Text.Span>)$9, (List<Tuple<GenericQualifiedName,Text.Span>>)$10, 
 		    (List<TypeMemberDecl>)$12, (List<CustomAttribute>)$1);
 		    
 		  SetCommentSetHelper($$, class_entry.Item2);
@@ -707,7 +712,7 @@ class_declaration_statement:
 	  { 
 		  Name class_name = new Name((string)$6);
 		  
-		  CheckReservedNamesAbsence((List<KeyValuePair<GenericQualifiedName,Text.Span>>)$9);
+		  CheckReservedNamesAbsence((List<Tuple<GenericQualifiedName,Text.Span>>)$9);
 		  
 			if ((PhpMemberAttributes)$3 != PhpMemberAttributes.None)
 				errors.Add(Errors.InvalidInterfaceModifier, SourceUnit, @3);
@@ -716,7 +721,7 @@ class_declaration_statement:
 				IsCurrentCodeConditional, GetScope(), 
 				(PhpMemberAttributes)$2 | PhpMemberAttributes.Abstract | PhpMemberAttributes.Interface, 
 				$4 != 0, class_name, @6, currentNamespace,
-				(List<FormalTypeParam>)$7, null, (List<KeyValuePair<GenericQualifiedName,Text.Span>>)$9,
+				(List<FormalTypeParam>)$7, null, (List<Tuple<GenericQualifiedName,Text.Span>>)$9,
 				(List<TypeMemberDecl>)$11, (List<CustomAttribute>)$1); 
 				
 			SetCommentSetHelper($$, $5);
@@ -725,11 +730,6 @@ class_declaration_statement:
 
 			UnreserveTypeNames((List<FormalTypeParam>)$7);
 	  }
-;
-
-class_identifier:
-	  identifier { $$ = $1; }
-	| T_ASSERT { $$ = $1.Object; }
 ;
 
 modifier_opt:
@@ -766,13 +766,13 @@ implements_opt:
 interface_list:
 		qualified_static_type_ref						
 		{ 
-			$$ = NewList<KeyValuePair<GenericQualifiedName,Text.Span>>(new KeyValuePair<GenericQualifiedName,Text.Span>((GenericQualifiedName)$1, @1));
+			$$ = NewList<Tuple<GenericQualifiedName,Text.Span>>(new Tuple<GenericQualifiedName,Text.Span>((GenericQualifiedName)$1, @1));
 		}		
 		
 	|	interface_list ',' qualified_static_type_ref	
 		{ 
 			$$ = $1; 
-			ListAdd<KeyValuePair<GenericQualifiedName,Text.Span>>($$, new KeyValuePair<GenericQualifiedName,Text.Span>((GenericQualifiedName)$3, @3)); 
+			ListAdd<Tuple<GenericQualifiedName,Text.Span>>($$, new Tuple<GenericQualifiedName,Text.Span>((GenericQualifiedName)$3, @3)); 
 		}
 ;
 
@@ -1095,6 +1095,10 @@ non_empty_statement:
 		{ 
 			$$ = new GotoStmt(@$, (string)$2); /* PHP6 */ 
 		}
+	|	T_DECLARE '(' declare_list ')' declare_statement
+		{
+			$$ = new DeclareStmt(@$, (Statement)$5);
+		}
 ;
 
 
@@ -1143,6 +1147,16 @@ for_statement:
 foreach_statement:
 		statement																	    { $$ = $1; }
 	|	':' inner_statement_list_opt T_ENDFOREACH ';' { $$ = new BlockStmt(@2, (List<Statement>)$2); }
+;
+
+declare_statement:
+		statement										{ $$ = $1; }
+	|	':' inner_statement_list_opt T_ENDDECLARE ';'	{ $$ = new BlockStmt(@2, (List<Statement>)$2); }
+;
+
+declare_list:
+		identifier '=' constant_inititalizer					{ /*not supported*/ }
+	|	declare_list ',' identifier '=' constant_inititalizer	{ /*not supported*/ }
 ;
 
 switch_case_list:
@@ -1374,7 +1388,7 @@ class_statement:
 		  SetCommentSetHelper($$, $2);
 		}
 		
-	|	attributes_opt member_modifiers_opt T_FUNCTION reference_opt class_method_identifier 
+	|	attributes_opt member_modifiers_opt T_FUNCTION reference_opt identifier 
 	  type_parameter_list_opt
 	  {
 			ReserveTypeNames((List<FormalTypeParam>)$6);
@@ -1444,12 +1458,6 @@ trait_alias:
 trait_modifiers:
 		/* empty */		{ $$ = null; }
 	|	member_modifier	{ $$ = (PhpMemberAttributes?)((TmpMemberInfo)$1).attr; }
-;
-
-class_method_identifier:
-	identifier { $$ = $1; }
-	|
-	T_ASSERT { $$ = "assert"; }
 ;
 
 base_ctor_call_opt:
@@ -1695,8 +1703,7 @@ expr_without_chain:
 	|	T_LIST '(' assignment_list ')' '=' expr { $$ = new ListEx(@$, (List<Expression>)$3, (Expression)$6); }
 	|	T_ISSET '(' writable_chain_list ')'     { $$ = new IssetEx(@$, (List<VariableUse>)$3); }
 	|	T_EMPTY '(' chain ')'				            { $$ = new EmptyEx(@$, (Expression)$3); }		
-	|	T_EVAL '(' expr ')'                     { $$ = new EvalEx(@$, (Expression)$3, false); }
-	|	T_ASSERT '(' expr ')'                   { $$ = new EvalEx(@$, (Expression)$3, true); }
+	|	T_EVAL '(' expr ')'                     { $$ = new EvalEx(@$, (Expression)$3); }
 	|	T_EXIT exit_expr_opt		                { $$ = new ExitEx(@$, (Expression)$2); }
 	|	scalar_expr                             { $$ = $1; }			
 	|	string_constant '[' expr ']'			{ $$ = new StringLiteralDereferenceEx(@$, (Expression)$1, (Expression)$3); }
@@ -1741,6 +1748,8 @@ lambda_function_expression:
             GetScope(), currentNamespace,
             static_doc_ref.Item3, (List<FormalParam>)$2, (List<FormalParam>)$4,
             (List<Statement>)$7);
+
+		reductionsSink.LambdaFunctionReduced(this, (LambdaFunctionExpr)$$);
 
 		LeaveConditionalCode();
 	}
@@ -1923,12 +1932,12 @@ qualified_namespace_name:
 ;
 
 namespace_name_list:
-		class_identifier												{ $$ = new List<string>( ((string)$1).Split('\\') ); if (((List<string>)$$)[0]==""){ Debug.Fail("TODO: fully qualified namespace name!"); } }
+		identifier														{ $$ = new List<string>( ((string)$1).Split('\\') ); if (((List<string>)$$)[0]==""){ Debug.Fail("TODO: fully qualified namespace name!"); } }
 	|	namespace_name_list T_NS_SEPARATOR namespace_name_identifier	{ $$ = $1; ListAdd<string>($$, $3 ); }
 ;
 
 namespace_name_identifier:	// identifier + some keywords that should be used within qualified name (List, Array, ...)
-		class_identifier	{ $$ = $1; }
+		identifier			{ $$ = $1; }
 	|	T_LIST				{ $$ = CSharpNameToken(@1, (string)$1.Object); }
 	|	T_BOOL_TYPE			{ $$ = CSharpNameToken(@1, (string)$1.Object); }
 	|	T_INT_TYPE			{ $$ = CSharpNameToken(@1, (string)$1.Object); }

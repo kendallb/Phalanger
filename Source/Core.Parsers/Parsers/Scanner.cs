@@ -220,7 +220,7 @@ namespace PHP.Core.Parsers
 
                     case Tokens.T_DOC_COMMENT:
                         // remember token value to be used by the next token and skip the current:
-                        this.lastDocComment = new PHPDocBlock(base.GetTokenString(), new ShortPosition(TokenTextSpan.Start));
+                        this.lastDocComment = new PHPDocBlock(base.GetTokenString(), TokenTextSpan);
                         this.commentsSink.OnPhpDocComment(this, this.lastDocComment);
                         break;
 
@@ -268,7 +268,6 @@ namespace PHP.Core.Parsers
 
                     case Tokens.T_ARRAY:
                     case Tokens.T_LIST:
-                    case Tokens.T_ASSERT:
                         tokenSemantics.Object = base.GetTokenString();  // remember the token string, so we can use these tokens as literals later, case sensitively
                         goto default;
 
@@ -455,7 +454,18 @@ namespace PHP.Core.Parsers
 					case Tokens.T_CLOSE_TAG:
                         this.commentsSink.OnCloseTag(this, TokenTextSpan);                        
 						token = Tokens.T_SEMI;
-						goto case Tokens.T_SEMI;
+						goto default;
+
+                    case Tokens.EOF:
+                        if (this.CurrentLexicalState == LexicalStates.ST_ONE_LINE_COMMENT)
+                        {
+                            this.CurrentLexicalState = LexicalStates.ST_IN_SCRIPTING;
+                            token = Tokens.T_LINE_COMMENT;
+                            _yymore();
+                            goto case Tokens.T_LINE_COMMENT;
+                        }
+                        goto default;
+
 
 					case Tokens.T_TRUE:
 					case Tokens.T_FALSE:
