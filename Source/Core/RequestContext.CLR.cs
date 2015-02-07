@@ -164,7 +164,7 @@ namespace PHP.Core
 			RequestContext req_context = currentContext;
 
 			// already initialized within the current request:
-			if (req_context != null && req_context.httpContext.Timestamp == context.Timestamp)
+            if (req_context != null && req_context.httpContext != null && req_context.httpContext.Timestamp == context.Timestamp)
 				return req_context;
 
 			Debug.WriteLine("REQUEST", "-- started ----------------------");
@@ -643,9 +643,9 @@ namespace PHP.Core
 			// updates session cookie expiration stamp:
 			UpdateSessionCookieExpiration();
 
-			this.httpContext = null;
-			currentContext = null;
-		}
+            this.httpContext = null;
+            currentContext = null;
+        }
 
 		#endregion
 
