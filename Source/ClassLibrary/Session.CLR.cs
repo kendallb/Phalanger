@@ -28,6 +28,7 @@ using System.Web.Configuration;
 using System.Security.Cryptography;
 using System.Collections.Generic;
 using System.Diagnostics;
+using PHP.Core.Utilities;
 
 namespace PHP.Library
 {
@@ -339,7 +340,7 @@ namespace PHP.Library
 			/// </summary>
 			private static void Clear()
 			{
-				_current = null;
+				_current.Value = null;
 			}
 
 			/// <summary>
@@ -357,13 +358,14 @@ namespace PHP.Library
 			{
 				get
 				{
-					if (_current == null) _current = new Handlers();
-					return _current;
+				    var current = _current.Value;
+					if (current == null) 
+                        current = _current.Value = new Handlers();
+					return current;
 				}
 			}
-			[ThreadStatic]
-			private static Handlers _current = null;
-		}
+            private static RequestStatic<Handlers> _current = new RequestStatic<Handlers>(() => _current.Value);
+        }
 
 		#endregion
 

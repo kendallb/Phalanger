@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using PHP.Core.Utilities;
 
 namespace PHP.Core
 {
@@ -20,8 +21,7 @@ namespace PHP.Core
         /// The resources are disposed of when the request is over.
         /// <seealso cref="RegisterResource"/><seealso cref="CleanUpResources"/>
         /// </remarks>
-        [ThreadStatic]
-        private static LinkedList<WeakReference> resources;
+        private static RequestStatic<LinkedList<WeakReference>> _resources = new RequestStatic<LinkedList<WeakReference>>(() => _resources.Value);
 
         #endregion
 
@@ -47,8 +47,9 @@ namespace PHP.Core
             Debug.Assert(res != null);
             //Debug.Assert(this method can only be called on the request thread)
 
+            var resources = _resources.Value;
             if (resources == null)
-                resources = new LinkedList<WeakReference>();
+                resources = _resources.Value = new LinkedList<WeakReference>();
 
             return resources.AddFirst(new WeakReference(res));
         }
@@ -68,6 +69,7 @@ namespace PHP.Core
         /// </summary>
         internal static void CleanUpResources()
         {
+            var resources = _resources.Value;
             if (resources != null)
             {
                 for (var p = resources.First; p != null; )
@@ -82,7 +84,7 @@ namespace PHP.Core
                     p = next;
                 }
 
-                resources = null;
+                _resources.Value = null;
             }
         }
 

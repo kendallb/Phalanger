@@ -373,6 +373,7 @@
     <Compile Include="StreamWrappers.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Utilities\RequestStatic.cs" />
     <Compile Include="Utils.CLR.cs" />
     <Compile Include="Utils.cs">
       <SubType>Code</SubType>

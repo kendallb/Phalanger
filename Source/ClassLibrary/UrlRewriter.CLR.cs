@@ -24,6 +24,7 @@ using System.Collections.Generic;
 
 using PHP.Core;
 using System.Diagnostics;
+using PHP.Core.Utilities;
 
 namespace PHP.Library
 {
@@ -51,7 +52,9 @@ namespace PHP.Library
 
 		private static UrlRewriter/*!*/ GetOrCreate()
 		{
-			if (current == null) current = new UrlRewriter();
+		    var current = _current.Value;
+			if (current == null) 
+                current = _current.Value = new UrlRewriter();
 			return current;
 		}
 
@@ -161,16 +164,15 @@ namespace PHP.Library
 		/// <summary>
 		/// A context associated with the current thread.
 		/// </summary>
-		public static UrlRewriter Current { get { return current; } }
-		[ThreadStatic]
-		private static UrlRewriter current;
+		public static UrlRewriter Current { get { return _current.Value; } }
+        private static RequestStatic<UrlRewriter> _current = new RequestStatic<UrlRewriter>(() => _current.Value);
 
 		/// <summary>
 		/// Clears thread static field. Called on request end.
 		/// </summary>
 		public static void Clear()
 		{
-			current = null;
+			_current.Value = null;
 		}
 
 		/// <summary>

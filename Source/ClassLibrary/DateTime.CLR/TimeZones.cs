@@ -25,6 +25,7 @@ using System.Runtime.InteropServices;
 using PHP.Core;
 using PHP.Core.Reflection;
 using System.Diagnostics;
+using PHP.Core.Utilities;
 
 #if SILVERLIGHT
 using PHP.CoreCLR;
@@ -436,16 +437,17 @@ namespace PHP.Library
             get
             {
                 // timezone is set by date_default_timezone_set(), return this one
-                if (_default != null)
-                    return _default;
+                var def = _default.Value;
+                if (def != null)
+                    return def;
 
                 // default timezone was not set, use & cache the current timezone
-                return (_current ?? (_current = new CurrentTimeZoneCache())).TimeZone;
+                return (_current.Value ?? (_current.Value = new CurrentTimeZoneCache())).TimeZone;
             }
 #if DEBUG   // for unit tests only
             internal set
             {
-                _current = new CurrentTimeZoneCache(value);
+                _current.Value = new CurrentTimeZoneCache(value);
             }
 #endif
         }
@@ -453,18 +455,12 @@ namespace PHP.Library
         /// <summary>
         /// Time zone set as current. <B>null</B> initially.
         /// </summary>
-#if !SILVERLIGHT
-        [ThreadStatic]
-#endif
-        private static TimeZoneInfo _default;
+        private static RequestStatic<TimeZoneInfo> _default = new RequestStatic<TimeZoneInfo>(() => _default.Value);
 
         /// <summary>
         /// Time zone set as current. <B>null</B> initially.
         /// </summary>
-#if !SILVERLIGHT
-        [ThreadStatic]
-#endif
-        private static CurrentTimeZoneCache _current;
+        private static RequestStatic<CurrentTimeZoneCache> _current = new RequestStatic<CurrentTimeZoneCache>(() => _current.Value);
 
         #region CurrentTimeZoneCache
 
@@ -562,8 +558,8 @@ namespace PHP.Library
         /// </summary>
         private static void Clear()
         {
-            _current = null;
-            _default = null;
+            _current.Value = null;
+            _default.Value = null;
         }
 
 #if !SILVERLIGHT
@@ -659,7 +655,7 @@ namespace PHP.Library
                 PhpException.Throw(PhpError.Notice, LibResources.GetString("unknown_timezone", zoneName));
                 return false;
             }
-            _default = zone;
+            _default.Value = zone;
             return true;
         }
 

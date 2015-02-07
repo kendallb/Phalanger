@@ -5,6 +5,7 @@ using System.Text;
 using PHP.Core;
 using System.ComponentModel;
 using PHP.Core.Reflection;
+using PHP.Core.Utilities;
 
 namespace PHP.Library.Xml
 {
@@ -253,11 +254,9 @@ namespace PHP.Library.Xml
 
         #region Fields
 
-        [ThreadStatic]
-        private static List<XmlError> error_list;
+        private static RequestStatic<List<XmlError>> _error_list = new RequestStatic<List<XmlError>>(() => _error_list.Value);
 
-        [ThreadStatic]
-        private static Action<XmlError> error_handler;
+        private static RequestStatic<Action<XmlError>> _error_handler = new RequestStatic<Action<XmlError>>(() => _error_handler.Value);
 
         #endregion
 
@@ -269,8 +268,8 @@ namespace PHP.Library.Xml
             // clears error list and handlers:
             RequestContext.RequestEnd += () =>
                 {
-                    error_list = null;
-                    error_handler = null;
+                    _error_list.Value = null;
+                    _error_handler.Value = null;
                 };
         }
 
@@ -287,6 +286,7 @@ namespace PHP.Library.Xml
             if (err == null)
                 return;
 
+            var error_handler = _error_handler.Value;
             if (error_handler != null)
             {
                 error_handler(err);
@@ -304,7 +304,7 @@ namespace PHP.Library.Xml
         [ImplementsFunction("libxml_clear_errors")]
         public static void ClearErrors()
         {
-            error_list = null;
+            _error_list.Value = null;
         }
 
         [ImplementsFunction("libxml_disable_entity_loader")]
@@ -322,6 +322,7 @@ namespace PHP.Library.Xml
         [ImplementsFunction("libxml_get_errors")]
         public static PhpArray/*!*/GetErrors(ScriptContext/*!*/context)
         {
+            var error_list = _error_list.Value;
             if (error_list == null)
                 return new PhpArray();
 
@@ -332,6 +333,7 @@ namespace PHP.Library.Xml
         [return: CastToFalse]
         public static PhpObject GetLastError(ScriptContext/*!*/context)
         {
+            var error_list = _error_list.Value;
             if (error_list == null || error_list.Count == 0)
                 return null;
 
@@ -361,23 +363,24 @@ namespace PHP.Library.Xml
         [ImplementsFunction("libxml_use_internal_errors")]
         public static bool UseInternalErrors(bool use_errors)
         {
-            bool previousvalue = error_handler != null;
+            bool previousvalue = _error_handler.Value != null;
 
             if (use_errors)
             {
-                error_handler = (err) =>
-                    {
-                        if (error_list == null)
-                            error_list = new List<XmlError>();
+                _error_handler.Value = (err) =>
+                {
+                    var error_list = _error_list.Value;
+                    if (error_list == null)
+                        error_list = _error_list.Value = new List<XmlError>();
 
-                        error_list.Add(err);
-                    };
+                    error_list.Add(err);
+                };
                 //error_list = error_list;// keep error_list as it is
             }
             else
             {
-                error_handler = null;   // outputs xml errors
-                error_list = null;
+                _error_handler.Value = null;   // outputs xml errors
+                _error_list.Value = null;
             }
 
             return previousvalue;

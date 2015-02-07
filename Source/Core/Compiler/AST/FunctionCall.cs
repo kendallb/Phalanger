@@ -429,7 +429,7 @@ namespace PHP.Core.Compiler.AST
                         // catch runtime errors
                         var oldErrorOverride = PhpException.ThrowCallbackOverride;
                         if (!(analyzer.ErrorSink is EvalErrorSink || analyzer.ErrorSink is WebErrorSink)) // avoid infinite recursion, PhpExceptions in such cases are passed
-                            PhpException.ThrowCallbackOverride = (error, message) =>
+                            PhpException.ThrowCallbackOverride.Value = (error, message) =>
                             {
                                 var position = new Text.TextSpan(analyzer.SourceUnit, node.Span);
                                 analyzer.ErrorSink.AddInternal(
