@@ -113,13 +113,13 @@ namespace PHP.Core.AST
 		public bool AliasReturn { get { return aliasReturn; } }
 		private readonly bool aliasReturn;
 
-		public List<FormalParam>/*!*/ FormalParams { get { return formalParams; } }
-		private readonly List<FormalParam>/*!*/ formalParams;
+		public FormalParam[]/*!*/ FormalParams { get { return formalParams; } }
+		private readonly FormalParam[]/*!*/ formalParams;
 
-		public Signature(bool aliasReturn, List<FormalParam>/*!*/ formalParams)
+		public Signature(bool aliasReturn, IList<FormalParam>/*!*/ formalParams)
 		{
 			this.aliasReturn = aliasReturn;
-			this.formalParams = formalParams;
+			this.formalParams = formalParams.AsArray();
 		}
 	}
 
@@ -131,7 +131,7 @@ namespace PHP.Core.AST
 	/// Represents a function declaration.
 	/// </summary>
     [Serializable]
-    public sealed class FunctionDecl : Statement
+    public sealed class FunctionDecl : Statement, IHasSourceUnit
 	{ 
 		internal override bool IsDeclaration { get { return true; } }
 
@@ -146,9 +146,9 @@ namespace PHP.Core.AST
 
         public TypeSignature TypeSignature { get { return typeSignature; } }
 		private readonly TypeSignature typeSignature;
-		
-        public List<Statement>/*!*/ Body { get { return body; } }
-        private readonly List<Statement>/*!*/ body;
+
+        public Statement[]/*!*/ Body { get { return body; } }
+        private readonly Statement[]/*!*/ body;
 
         /// <summary>
         /// Gets value indicating whether the function is declared conditionally.
@@ -161,7 +161,7 @@ namespace PHP.Core.AST
         public PhpMemberAttributes MemberAttributes { get; private set; }
 
         internal Scope Scope { get; private set; }
-        internal SourceUnit/*!*/ SourceUnit { get; private set; }
+        public SourceUnit/*!*/ SourceUnit { get; private set; }
         
         /// <summary>
         /// Gets collection of CLR attributes annotating this statement.
@@ -187,7 +187,7 @@ namespace PHP.Core.AST
             Text.Span span, Text.Span entireDeclarationPosition, int headingEndPosition, int declarationBodyPosition,
 			bool isConditional, Scope scope, PhpMemberAttributes memberAttributes, string/*!*/ name, NamespaceDecl ns,
 			bool aliasReturn, List<FormalParam>/*!*/ formalParams, List<FormalTypeParam>/*!*/ genericParams,
-			List<Statement>/*!*/ body, List<CustomAttribute> attributes)
+			IList<Statement>/*!*/ body, List<CustomAttribute> attributes)
 			: base(span)
 		{
 			Debug.Assert(genericParams != null && name != null && formalParams != null && body != null);
@@ -198,7 +198,7 @@ namespace PHP.Core.AST
 			this.typeSignature = new TypeSignature(genericParams);
 			if (attributes != null && attributes.Count != 0)
                 this.Attributes = new CustomAttributes(attributes);
-			this.body = body;
+			this.body = body.AsArray();
 			this.entireDeclarationPosition = entireDeclarationPosition;
             this.headingEndPosition = headingEndPosition;
             this.declarationBodyPosition = declarationBodyPosition;

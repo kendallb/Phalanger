@@ -35,13 +35,13 @@ namespace PHP.Core.AST
     /// class. The sample code below illustrates a part of PHP global code
     /// </remarks>
     [Serializable]
-    public sealed class GlobalCode : AstNode
+    public sealed class GlobalCode : AstNode, IHasSourceUnit
     {
         /// <summary>
         /// Array of nodes representing statements in PHP global code
         /// </summary>
-        public List<Statement>/*!*/ Statements { get { return statements; } }
-        private readonly List<Statement>/*!*/ statements;
+        public Statement[]/*!*/ Statements { get { return statements; } internal set { statements = value; } }
+        private Statement[]/*!*/ statements;
 
         /// <summary>
         /// Represented source unit.
@@ -54,12 +54,12 @@ namespace PHP.Core.AST
         /// <summary>
         /// Initializes a new instance of the GlobalCode class.
         /// </summary>
-        public GlobalCode(List<Statement>/*!*/ statements, SourceUnit/*!*/ sourceUnit)
+        public GlobalCode(IList<Statement>/*!*/ statements, SourceUnit/*!*/ sourceUnit)
         {
             Debug.Assert(statements != null && sourceUnit != null);
 
             this.sourceUnit = sourceUnit;
-            this.statements = statements;
+            this.statements = statements.AsArray();
         }
 
         #endregion

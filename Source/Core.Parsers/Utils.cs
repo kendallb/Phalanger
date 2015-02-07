@@ -1102,7 +1102,6 @@ namespace PHP.Core
             return value;
         }
 
-
         /// <summary>
         /// Creates dictionary from two enumerators.
         /// </summary>
@@ -1152,6 +1151,14 @@ namespace PHP.Core
         {
             foreach (T el in en) if (f(el)) yield return el;
         }
+
+        /// <summary>
+        /// Determines whether the collection is not empty.
+        /// </summary>
+        public static bool Any<T>(this ICollection<T> list)
+        {
+            return list != null && list.Count != 0;
+        }
     }
     
     /// <summary>
@@ -1200,6 +1207,37 @@ namespace PHP.Core
         public static T Last<T>(this IList<T>/*!*/list)
         {
             return list[list.Count - 1];
+        }
+
+        /// <summary>
+        /// Determines whether the list is not empty.
+        /// </summary>
+        public static bool Any<T>(this List<T> list)
+        {
+            return list != null && list.Count != 0;
+        }
+
+        /// <summary>
+        /// Copies entries into new array, or gets empty array if the collection is empty.
+        /// </summary>
+        public static T[]/*!*/AsArray<T>(this IList<T> list)
+        {
+            T[] result = list as T[];
+
+            if (result == null)
+            {
+                if (list.Any())
+                {
+                    result = new T[list.Count];
+                    list.CopyTo(result, 0);
+                }
+                else
+                {
+                    result = EmptyArray<T>.Instance;
+                }
+            }
+
+            return result;
         }
     }
 
@@ -1566,6 +1604,27 @@ namespace PHP.Core
         }
 
         /// <summary>
+        /// Concats array of <typeparamref name="T"/> with single <typeparamref name="T"/> element.
+        /// </summary>
+        public static T[]/*!*/Concat<T>(T x, T[] y)
+        {
+            T[] result;
+
+            if (y.Any())
+            {
+                result = new T[1 + y.Length];
+                result[0] = x;
+                Array.Copy(y, 0, result, 1, y.Length);
+            }
+            else
+            {
+                result = new T[] { x };
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Concats two arrays of bytes.
         /// </summary>
         /// <param name="x">The first array of bytes to be concatenated.</param>
@@ -1705,7 +1764,8 @@ namespace PHP.Core
         /// <returns>New list of unique items. Cannot return null.</returns>
         public static ICollection<T>/*!*/Unique<T>(IList<T> items)
         {
-            if (items == null || items.Count == 0) return (ICollection<T>)new T[0];
+            if (items == null || items.Count == 0)
+                return EmptyArray<T>.Instance;
 
             return new HashSet<T>(items);
         }
@@ -1718,7 +1778,7 @@ namespace PHP.Core
         /// <returns>Unique array of element. Cannot be null.</returns>
         public static T[]/*!*/EnsureUnique<T>(T[] items)
         {
-            if (items == null) return new T[0];
+            if (items == null) return EmptyArray<T>.Instance;
             if (items.Length == 0) return items;
 
             var set = new HashSet<T>(items);
@@ -1797,6 +1857,45 @@ namespace PHP.Core
                 return ms.ToArray();
             }
         }
+
+        /// <summary>
+        /// Determines whether the array is not empty.
+        /// </summary>
+        public static bool Any<T>(this T[] arr)
+        {
+            return arr != null && arr.Length != 0;
+        }
+
+        /// <summary>
+        /// Determines whether the array is empty or <c>null</c> reference.
+        /// </summary>
+        public static bool Empty<T>(this T[] arr)
+        {
+            return !Any<T>(arr);
+        }
+
+        /// <summary>
+        /// Copies a part of given array into a new one. If the result array would be the same size as the original one, reference to the original one is returned directly.
+        /// </summary>
+        public static T[] TakeArray<T>(this T[] arr, int from, int count)
+        {
+            if (arr == null)
+                throw new ArgumentNullException();
+
+            if (count == 0)
+                return EmptyArray<T>.Instance; 
+            
+            if (from == 0 && count == arr.Length)
+                return arr;
+
+            if (from < 0 || from + count > arr.Length)
+                throw new ArgumentOutOfRangeException();
+
+            //
+            T[] result = new T[count];
+            Array.Copy(arr, from, result, 0, count);
+            return result;
+        }
     }
 
     #endregion
@@ -1850,7 +1949,7 @@ namespace PHP.Core
         /// </summary>
         public static StringComparer/*!*/StringComparer { get { return EqualityComparer.StringComparer; } }
 
-        public static readonly FullPath[]/*!*/ EmptyArray = new FullPath[0];
+        public static FullPath[]/*!*/ EmptyArray { get { return EmptyArray<FullPath>.Instance; } }
 
         /// <summary>
         /// Empty path.

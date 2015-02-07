@@ -41,6 +41,16 @@ namespace PHP.Core
         T GetProperty<T>();
 
         /// <summary>
+        /// Tries to get property from the container.
+        /// </summary>
+        bool TryGetProperty(object key, out object value);
+
+        /// <summary>
+        /// Tries to get property from the container.
+        /// </summary>
+        bool TryGetProperty<T>(out T value);
+
+        /// <summary>
         /// Removes property from the collection.
         /// </summary>
         /// <param name="key">Key to the property.</param>
@@ -124,6 +134,7 @@ namespace PHP.Core
 
             //
             object p = _type;
+            object o = _obj;
 
             // empty list
             if (p == null)
@@ -139,12 +150,12 @@ namespace PHP.Core
             // linked list
             else if (object.ReferenceEquals(p, TypeList))
             {
-                Debug.Assert(_obj is DictionaryNode);
+                Debug.Assert(o is DictionaryNode);
 
                 // replaces value if key already in collection,
                 // counts items
                 int count = 0;
-                for (var node = (DictionaryNode)_obj; node != null; node = node.next)
+                for (var node = (DictionaryNode)o; node != null; node = node.next)
                 {
                     if (object.Equals(node.key, key))
                     {
@@ -157,12 +168,12 @@ namespace PHP.Core
                 // add new item
                 if (count < MaxListSize)
                 {
-                    _obj = new DictionaryNode() { key = key, value = value, next = (DictionaryNode)_obj };
+                    _obj = new DictionaryNode() { key = key, value = value, next = (DictionaryNode)o };
                 }
                 else
                 {
                     // upgrade to hashtable
-                    var hashtable = ToHashtable((DictionaryNode)_obj);
+                    var hashtable = ToHashtable((DictionaryNode)o);
                     hashtable.Add(key, value);
 
                     _obj = hashtable;
@@ -172,8 +183,8 @@ namespace PHP.Core
             // hashtable
             else if (object.ReferenceEquals(p, TypeHashtable))
             {
-                Debug.Assert(_obj is Hashtable);
-                ((Hashtable)_obj)[key] = value;
+                Debug.Assert(o is Hashtable);
+                ((Hashtable)o)[key] = value;
             }
             // one item list,
             // upgrade to linked list
@@ -181,12 +192,12 @@ namespace PHP.Core
             {
                 _obj = new DictionaryNode()
                 {
-                    key = _type,
-                    value = _obj,
+                    key = key,
+                    value = value,
                     next = new DictionaryNode()
                     {
-                        key = key,
-                        value = value,
+                        key = p,
+                        value = o,
                         next = null,
                     }
                 };
@@ -206,36 +217,56 @@ namespace PHP.Core
         /// Tries to get property from the container.
         /// </summary>
         /// <param name="key">Key.</param>
-        /// <returns><c>null</c> or property value.</returns>
-        public object GetProperty(object key)
+        /// <param name="value">Out. Value of the property.</param>
+        /// <returns><c>true</c> if the property was found, otherwise <c>false</c>.</returns>
+        public bool TryGetProperty(object key, out object value)
         {
             CheckKey(key);
 
             object p = _type;
-            
+            object o = _obj;
+
             // empty container
             if (p != null)
             {
                 if (object.Equals(p, key))
                 {
-                    return _obj;
+                    value = o;
+                    return true;
                 }
                 else if (object.ReferenceEquals(p, TypeList))
                 {
-                    Debug.Assert(_obj is DictionaryNode);
-                    for (var node = (DictionaryNode)_obj; node != null; node = node.next)
+                    Debug.Assert(o is DictionaryNode);
+                    for (var node = (DictionaryNode)o; node != null; node = node.next)
                         if (object.Equals(node.key, key))
-                            return node.value;
+                        {
+                            value = node.value;
+                            return true;
+                        }
                 }
                 else if (object.ReferenceEquals(p, TypeHashtable))
                 {
-                    Debug.Assert(_obj is Hashtable);
-                    return ((Hashtable)_obj)[key];
+                    Debug.Assert(o is Hashtable);
+                    value = ((Hashtable)o)[key];
+                    return value != null || ((Hashtable)o).ContainsKey(key);
                 }
             }
 
             // nothing found
-            return null;
+            value = default(object);
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to get property from the container.
+        /// </summary>
+        /// <param name="key">Key.</param>
+        /// <returns><c>null</c> or property value.</returns>
+        public object GetProperty(object key)
+        {
+            object value;
+            TryGetProperty(key, out value);
+            return value;
         }
 
         /// <summary>
@@ -244,6 +275,22 @@ namespace PHP.Core
         public T GetProperty<T>()
         {
             return (T)GetProperty(typeof(T));
+        }
+
+        /// <summary>
+        /// Tries to get property from the container.
+        /// </summary>
+        public bool TryGetProperty<T>(out T value)
+        {
+            object tmp;
+            if (TryGetProperty(typeof(T), out tmp))
+            {
+                value = (T)tmp;
+                return true;
+            }
+
+            value = default(T);
+            return false;
         }
 
         /// <summary>
@@ -256,6 +303,7 @@ namespace PHP.Core
             CheckKey(key);
 
             var p = _type;
+            var o = _obj;
 
             if (p != null)
             {
@@ -267,9 +315,9 @@ namespace PHP.Core
                 }
                 else if (object.ReferenceEquals(p, TypeList))
                 {
-                    Debug.Assert(_obj is DictionaryNode);
+                    Debug.Assert(o is DictionaryNode);
                     DictionaryNode prev = null;
-                    for (var node = (DictionaryNode)_obj; node != null; node = node.next)
+                    for (var node = (DictionaryNode)o; node != null; node = node.next)
                     {
                         if (object.Equals(node.key, key))
                         {
@@ -294,8 +342,8 @@ namespace PHP.Core
                 }
                 else if (object.ReferenceEquals(p, TypeHashtable))
                 {
-                    Debug.Assert(_obj is Hashtable);
-                    var hashtable = (Hashtable)_obj;
+                    Debug.Assert(o is Hashtable);
+                    var hashtable = (Hashtable)o;
                     int count = hashtable.Count;
                     hashtable.Remove(key);
                     if (hashtable.Count != count)
@@ -338,10 +386,11 @@ namespace PHP.Core
             get
             {
                 var p = _type;
+                var o = _obj;
 
                 if (p == null) return 0;
-                if (object.ReferenceEquals(p, TypeList)) return CountItems((PropertyCollection.DictionaryNode)_obj);
-                if (object.ReferenceEquals(p, TypeHashtable)) return ((Hashtable)_obj).Count;
+                if (object.ReferenceEquals(p, TypeList)) return CountItems((PropertyCollection.DictionaryNode)o);
+                if (object.ReferenceEquals(p, TypeHashtable)) return ((Hashtable)o).Count;
                 return 1;
             }
         }

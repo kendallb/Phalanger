@@ -162,17 +162,17 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %token T_DEFAULT
 %token T_BREAK
 %token T_CONTINUE
-%token<Object> T_FUNCTION                 // PHPDocBlock
-%token<Object> T_CONST                    // PHPDocBlock
+%token T_FUNCTION
+%token T_CONST
 %token T_RETURN
 %token T_GLOBAL
-%token<Object> T_STATIC					  // PHPDocBlock
-%token<Object> T_VAR                      // PHPDocBlock
+%token T_STATIC
+%token T_VAR
 %token T_UNSET
 %token T_ISSET
 %token T_EMPTY
-%token<Object> T_CLASS                    // PHPDocBlock
-%token<Object> T_TRAIT                    // PHPDocBlock
+%token T_CLASS
+%token T_TRAIT
 %token T_INSTEADOF
 %token T_EXTENDS
 %token T_OBJECT_OPERATOR
@@ -188,7 +188,7 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %token T_FILE
 %token T_DIR
 %token T_COMMENT
-%token T_DOC_COMMENT
+%token<Object> T_DOC_COMMENT			  // PHPDocBlock
 %token T_PRAGMA_LINE
 %token T_PRAGMA_FILE
 %token T_PRAGMA_DEFAULT_LINE
@@ -221,13 +221,13 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %token T_CATCH
 %token T_FINALLY
 %token T_THROW
-%token<Object> T_INTERFACE                // PHPDocBlock
+%token T_INTERFACE     
 %token T_IMPLEMENTS
-%token<Object> T_ABSTRACT				  // PHPDocBlock
-%token<Object> T_FINAL					  // PHPDocBlock
-%token<Object> T_PRIVATE				  // PHPDocBlock
-%token<Object> T_PROTECTED				  // PHPDocBlock
-%token<Object> T_PUBLIC					  // PHPDocBlock
+%token T_ABSTRACT		
+%token T_FINAL			
+%token T_PRIVATE		
+%token T_PROTECTED		
+%token T_PUBLIC			
 %token T_CLONE
 %token T_INSTANCEOF
 %token T_NAMESPACE
@@ -316,9 +316,9 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %type<Object> namespace_statement_list_opt            // List<Statement>
 %type<Object> namespace_statement                     // Statement
 %type<Object> function_declaration_statement          // FunctionDecl
-%type<Object> function_declaration_head				  // Tuple<List<CustomAttribute>,object,bool>!	// <attributes,doc_comment,is_ref>
+%type<Object> function_declaration_head				  // Tuple<List<CustomAttribute>,bool>!	// <attributes,is_ref>
 %type<Object> ref_opt_identifier					  // Tuple<bool,string>!	// <is_ref, func_name>
-%type<Object> class_entry_type						  // Tuple<Tokens, PHPDocBlock>	// T_CLASS|T_TRAIT, PHPDocBlock
+%type<Object> class_entry_type						  // T_CLASS|T_TRAIT
 %type<Object> class_declaration_statement             // TypeDecl
 %type<Object> namespace_declaration_statement         // NamespaceDecl
 %type<Object> global_constant_declarator              // GlobalConstantDecl
@@ -460,7 +460,7 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %type<Object> finally_opt								// FinallyItem or null
 
 %type<Object> lambda_function_expression				// LambdaFuncExpr!
-%type<Object> lambda_function_head_						// Tuple<PhpMemberAttributes,object,bool>!	// <static,doc_comment,is_ref>
+%type<Object> lambda_function_head_						// Tuple<PhpMemberAttributes,bool>!	// <static,is_ref>
 %type<Object> lambda_function_use_var					// FormalParam!
 %type<Object> lambda_function_use_var_list				// List<FormalParam>!
 %type<Object> lambda_function_use_vars					// List<FormalParam>
@@ -469,10 +469,10 @@ using FcnParam = System.Tuple<System.Collections.Generic.List<PHP.Core.AST.TypeR
 %type<Integer> visibility_opt                // PhpMemberAttributes
 %type<Integer> partial_opt                   // int (0, 1)
 
-%type<Object>  property_modifiers            // TmpMemberInfo	// <modifiers, doccomment>
+%type<Integer> property_modifiers            // PhpMemberAttributes
 %type<Integer> member_modifiers_opt          // PhpMemberAttributes
-%type<Object>  member_modifiers              // TmpMemberInfo	// <modifiers, doccomment>
-%type<Object>  member_modifier               // TmpMemberInfo	// <modifiers, doccomment>
+%type<Integer> member_modifiers              // PhpMemberAttributes
+%type<Integer> member_modifier               // PhpMemberAttributes
 
 %type<Integer> attribute_target_opt          // CustomAttribute.Targets
 
@@ -549,7 +549,7 @@ use_statement_content: /* PHP 5.3 */
 ;
 
 top_statement_list:
-		top_statement_list top_statement { $$ = $1; if ($2 != null) ListAdd<Statement>($$, $2); } 
+		top_statement_list top_statement { $$ = StatementListAdd($1, $2); } 
 	|	top_statement                    { $$ = NewList<Statement>($1); }
 ;
 
@@ -605,7 +605,7 @@ namespace_declaration_statement:   /* PHP 5.3 */
 ;
 
 namespace_statement_list_opt: 	 /* PHP 5.3 */
-		namespace_statement_list_opt namespace_statement  { $$ = $1; ListAdd<Statement>($1, $2); }
+		namespace_statement_list_opt namespace_statement  { $$ = StatementListAdd($1, $2); }
 	|	/* empty */                                       { $$ = new List<Statement>(); }
 ;
 
@@ -630,18 +630,16 @@ function_declaration_statement:
 		'{' inner_statement_list_opt '}'
 		{
 			var func_name = (string)$2;
-			var attrs_doc_ref = (Tuple<List<CustomAttribute>,object,bool>)$1;
+			var attrs_ref = (Tuple<List<CustomAttribute>,bool>)$1;
 			
 			CheckTypeParameterNames((List<FormalTypeParam>)$3, func_name);
 			
 			$$ = new FunctionDecl(sourceUnit, @2, @$, GetHeadingEnd(@7), GetBodyStart(@9), 
 				IsCurrentCodeOneLevelConditional, GetScope(), 
 				PhpMemberAttributes.Public | PhpMemberAttributes.Static,
-				func_name, currentNamespace, attrs_doc_ref.Item3, 
-			  (List<FormalParam>)$6, (List<FormalTypeParam>)$3, (List<Statement>)$10, attrs_doc_ref.Item1);
+				func_name, currentNamespace, attrs_ref.Item2, 
+			  (List<FormalParam>)$6, (List<FormalTypeParam>)$3, (List<Statement>)$10, attrs_ref.Item1);
 			  
-			SetCommentSetHelper($$, attrs_doc_ref.Item2);
-			
 			reductionsSink.FunctionDeclarationReduced(this,	(FunctionDecl)$$); 
 			  
 			LeaveConditionalCode();
@@ -650,15 +648,15 @@ function_declaration_statement:
 ;
 
 function_declaration_head:
-		T_FUNCTION					{ $$ = new Tuple<List<CustomAttribute>,object,bool>(null, $1, false); }
-	|	attributes T_FUNCTION		{ $$ = new Tuple<List<CustomAttribute>,object,bool>((List<CustomAttribute>)$1, $2, false); }
-	|	T_FUNCTION '&'				{ $$ = new Tuple<List<CustomAttribute>,object,bool>(null, $1, true); }
-	|	attributes T_FUNCTION '&'	{ $$ = new Tuple<List<CustomAttribute>,object,bool>((List<CustomAttribute>)$1, $2, true); }
+		T_FUNCTION					{ $$ = new Tuple<List<CustomAttribute>,bool>(null, false); }
+	|	attributes T_FUNCTION		{ $$ = new Tuple<List<CustomAttribute>,bool>((List<CustomAttribute>)$1, false); }
+	|	T_FUNCTION '&'				{ $$ = new Tuple<List<CustomAttribute>,bool>(null, true); }
+	|	attributes T_FUNCTION '&'	{ $$ = new Tuple<List<CustomAttribute>,bool>((List<CustomAttribute>)$1, true); }
 ;
 
 class_entry_type:
-		T_CLASS		{ $$ = new Tuple<Tokens,PHPDocBlock>(Tokens.T_CLASS, $1 as PHPDocBlock); }
-	|	T_TRAIT		{ $$ = new Tuple<Tokens,PHPDocBlock>(Tokens.T_TRAIT, $1 as PHPDocBlock); }
+		T_CLASS		{ $$ = Tokens.T_CLASS; }
+	|	T_TRAIT		{ $$ = Tokens.T_TRAIT; }
 ;
 
 class_declaration_statement:
@@ -676,10 +674,8 @@ class_declaration_statement:
 		'{' class_statement_list_opt '}' 
 		{ 
 		  Name class_name = new Name((string)$6);
-		  var class_entry = (Tuple<Tokens,PHPDocBlock>)$5;
 		  var member_attr = (PhpMemberAttributes)($2 | $3);
-		  if (class_entry.Item1 == Tokens.T_TRAIT)
-			member_attr |= PhpMemberAttributes.Trait | PhpMemberAttributes.Abstract;
+		  if ((Tokens)$5 == Tokens.T_TRAIT) member_attr |= PhpMemberAttributes.Trait | PhpMemberAttributes.Abstract;
 		  
 		  CheckReservedNamesAbsence((Tuple<GenericQualifiedName,Text.Span>)$9);
 		  CheckReservedNamesAbsence((List<Tuple<GenericQualifiedName,Text.Span>>)$10);
@@ -688,12 +684,9 @@ class_declaration_statement:
 				IsCurrentCodeConditional, GetScope(), 
 				member_attr, $4 != 0, class_name, @6, currentNamespace, 
 				(List<FormalTypeParam>)$7, (Tuple<GenericQualifiedName,Text.Span>)$9, (List<Tuple<GenericQualifiedName,Text.Span>>)$10, 
-		    (List<TypeMemberDecl>)$12, (List<CustomAttribute>)$1);
+		    (List<LangElement>)$12, (List<CustomAttribute>)$1);
 		    
-		  SetCommentSetHelper($$, class_entry.Item2);
-				
 		  reductionsSink.TypeDeclarationReduced(this, (TypeDecl)$$);
-
 		  UnreserveTypeNames((List<FormalTypeParam>)$7);
 		}
 			
@@ -722,10 +715,8 @@ class_declaration_statement:
 				(PhpMemberAttributes)$2 | PhpMemberAttributes.Abstract | PhpMemberAttributes.Interface, 
 				$4 != 0, class_name, @6, currentNamespace,
 				(List<FormalTypeParam>)$7, null, (List<Tuple<GenericQualifiedName,Text.Span>>)$9,
-				(List<TypeMemberDecl>)$11, (List<CustomAttribute>)$1); 
+				(List<LangElement>)$11, (List<CustomAttribute>)$1); 
 				
-			SetCommentSetHelper($$, $5);
-			
 			reductionsSink.TypeDeclarationReduced(this, (TypeDecl)$$);
 
 			UnreserveTypeNames((List<FormalTypeParam>)$7);
@@ -927,7 +918,7 @@ attribute_named_arg:
 
 
 inner_statement_list_opt:
-		inner_statement_list_opt inner_statement  { $$ = $1; if ($2 != null) ListAdd<Statement>($$, $2); }
+		inner_statement_list_opt inner_statement  { $$ = StatementListAdd($1, $2); }
 	|	/* empty */                               { $$ = new List<Statement>(); }
 ;
 
@@ -953,7 +944,7 @@ statement:
 non_empty_statement:
 		identifier ':'     
 		{ 
-		  $$ = new LabelStmt(@$, (string)$1); /* PHP6 */ 
+		  $$ = new LabelStmt(@$, (string)$1, @1); /* PHP 5.3 */ 
 		}
 		
 	|	'{' inner_statement_list_opt '}' 
@@ -1093,11 +1084,15 @@ non_empty_statement:
 	
 	|	T_GOTO identifier ';'
 		{ 
-			$$ = new GotoStmt(@$, (string)$2); /* PHP6 */ 
+			$$ = new GotoStmt(@$, (string)$2, @2); /* PHP 5.3 */ 
 		}
 	|	T_DECLARE '(' declare_list ')' declare_statement
 		{
 			$$ = new DeclareStmt(@$, (Statement)$5);
+		}
+	|	T_DOC_COMMENT
+		{
+			$$ = CreatePHPDocBlockStmt($1);
 		}
 ;
 
@@ -1115,7 +1110,7 @@ catches:
 		}		
 	|	T_CATCH '(' qualified_static_type_ref T_VARIABLE ')'  '{' inner_statement_list_opt '}'
 		{
-			$$ = NewList<CatchItem>(new CatchItem(@4, (GenericQualifiedName)$3, new DirectVarUse(@4, (string)$4), (List<Statement>)$7));
+			$$ = NewList<CatchItem>(new CatchItem(@3, (GenericQualifiedName)$3, new DirectVarUse(@4, (string)$4), (List<Statement>)$7));
 		} 
 ;
 
@@ -1367,25 +1362,21 @@ static_variable:
 		}
 ;
 
-
 class_statement_list_opt:
-		class_statement_list_opt class_statement  { $$ = $1; ListAdd<TypeMemberDecl>($$, $2); }
-	|	/* empty */														    { $$ = new List<TypeMemberDecl>(); }
+		class_statement_list_opt class_statement	{ $$ = ListAdd<LangElement>($1, $2); }
+	|	/* empty */									{ $$ = new List<LangElement>(); }
 ;
-
 
 class_statement:
 		attributes_opt property_modifiers property_declarator_list ';'			
 		{ 
-			var modifier_comment = (TmpMemberInfo)$2;
-			$$ = new FieldDeclList(@$, modifier_comment.attr, (List<FieldDecl>)$3, (List<CustomAttribute>)$1); 
-			SetCommentSetHelper($$, modifier_comment.docComment);
+			var modifier = (PhpMemberAttributes)$2;
+			$$ = new FieldDeclList(@$, modifier, (List<FieldDecl>)$3, (List<CustomAttribute>)$1); 
 		}
 		 
 	|	attributes_opt T_CONST class_constant_declarator_list ';'
 		{ 
 		  $$ = new ConstDeclList(@$, (List<ClassConstantDecl>)$3, (List<CustomAttribute>)$1);
-		  SetCommentSetHelper($$, $2);
 		}
 		
 	|	attributes_opt member_modifiers_opt T_FUNCTION reference_opt identifier 
@@ -1405,12 +1396,11 @@ class_statement:
 			$$ = new MethodDecl(@5, @$, GetHeadingEnd(GetLeftValidPosition(11)),GetBodyStart(@13), (string)$5, (int)$4 != 0, (List<FormalParam>)$9, (List<FormalTypeParam>)$6,
 				(List<Statement>)$13, (PhpMemberAttributes)$2, (List<ActualParam>)$11, (List<CustomAttribute>)$1); 
 				
-			SetCommentSetHelper($$, $3);
-			
 			LeaveConditionalCode();
 			UnreserveTypeNames((List<FormalTypeParam>)$6);
 		}
 	|	trait_use_statement		{ $$ = $1; }
+	|	T_DOC_COMMENT			{ $$ = $1; }
 ;
 
 trait_use_statement:
@@ -1452,12 +1442,12 @@ trait_method_reference_fully_qualified:
 
 trait_alias:
 		trait_method_reference T_AS trait_modifiers identifier ';'	{ $$ = new TraitsUse.TraitAdaptationAlias(@$, (Tuple<QualifiedName?, Name>)$1, (string)$4, (PhpMemberAttributes?)$3); }
-	|	trait_method_reference T_AS member_modifier	';'				{ $$ = new TraitsUse.TraitAdaptationAlias(@$, (Tuple<QualifiedName?, Name>)$1, null, ((TmpMemberInfo)$1).attr); }
+	|	trait_method_reference T_AS member_modifier	';'				{ $$ = new TraitsUse.TraitAdaptationAlias(@$, (Tuple<QualifiedName?, Name>)$1, null, (PhpMemberAttributes)$3); }
 ;
 
 trait_modifiers:
 		/* empty */		{ $$ = null; }
-	|	member_modifier	{ $$ = (PhpMemberAttributes?)((TmpMemberInfo)$1).attr; }
+	|	member_modifier	{ $$ = (PhpMemberAttributes)$1; }
 ;
 
 base_ctor_call_opt:
@@ -1479,12 +1469,12 @@ method_body:
 
 property_modifiers:
 		member_modifiers	{ $$ = $1; }
-	|	T_VAR				{ $$ = TmpMemberInfoSingleton.Update(PhpMemberAttributes.Public, $1); }
+	|	T_VAR				{ $$ = (int)PhpMemberAttributes.Public; }
 ;
 
 member_modifiers_opt:
 		/* empty */			{ $$ = (int)PhpMemberAttributes.Public; }
-	|	member_modifiers	{ $$ = (int)((TmpMemberInfo)$1).attr; }
+	|	member_modifiers	{ $$ = (int)(PhpMemberAttributes)$1; }
 ;
 
 member_modifiers:
@@ -1494,30 +1484,29 @@ member_modifiers:
 		}
 	|	member_modifiers member_modifier	
 		{ 
-		  var a1 = (TmpMemberInfo)$1;
-		  var a2 = (TmpMemberInfo)$2;
+		  var a1 = (PhpMemberAttributes)$1;
+		  var a2 = (PhpMemberAttributes)$2;
 
-		  if ((a1.attr & PhpMemberAttributes.VisibilityMask) != 0 && (a2.attr & PhpMemberAttributes.VisibilityMask) != 0)
+		  if ((a1 & PhpMemberAttributes.VisibilityMask) != 0 && (a2 & PhpMemberAttributes.VisibilityMask) != 0)
 		    errors.Add(Errors.MultipleVisibilityModifiers, SourceUnit, @2);
 		  
 		  // merge $2 into $1
-		  a1.attr |= a2.attr;
+		  a1 |= a2;
 		  // This wouldn't allow for "public abstract function" although php does.
 		  // It is broken anyway, because we assume we have a token on the stack before seeing a modified.
-		  //Debug.Assert(object.ReferenceEquals(a1.docComment, a2.docComment));
-
+		  
 		  // return $1
-		  $$ = $1;
+		  $$ = (int)a1;
 		}
 ;
                    
 member_modifier:
-		T_PUBLIC			{ $$ = new TmpMemberInfo(PhpMemberAttributes.Public, $1); }
-	|	T_PROTECTED			{ $$ = new TmpMemberInfo(PhpMemberAttributes.Protected, $1); }		
-	|	T_PRIVATE			{ $$ = new TmpMemberInfo(PhpMemberAttributes.Private, $1); }	
-	|	T_STATIC			{ $$ = new TmpMemberInfo(PhpMemberAttributes.Static, $1); }	
-	|	T_ABSTRACT			{ $$ = new TmpMemberInfo(PhpMemberAttributes.Abstract, $1); }		
-	|	T_FINAL				{ $$ = new TmpMemberInfo(PhpMemberAttributes.Final, $1); }	
+		T_PUBLIC			{ $$ = (int)PhpMemberAttributes.Public; }
+	|	T_PROTECTED			{ $$ = (int)PhpMemberAttributes.Protected; }		
+	|	T_PRIVATE			{ $$ = (int)PhpMemberAttributes.Private; }	
+	|	T_STATIC			{ $$ = (int)PhpMemberAttributes.Static; }	
+	|	T_ABSTRACT			{ $$ = (int)PhpMemberAttributes.Abstract; }		
+	|	T_FINAL				{ $$ = (int)PhpMemberAttributes.Final; }	
 ;
 
 property_declarator_list:
@@ -1593,7 +1582,6 @@ global_constant_declaration_statement:
 	attributes_opt T_CONST global_constant_declarator_list ';'
   { 
 	  $$ = new GlobalConstDeclList(@$, (List<GlobalConstantDecl>)$3, (List<CustomAttribute>)$1); 
-	  SetCommentSetHelper($$, $2);
 	}
 ;
 
@@ -1741,12 +1729,12 @@ lambda_function_expression:
 	}
 	'{' inner_statement_list_opt '}'
 	{
-		var static_doc_ref = (Tuple<PhpMemberAttributes,object,bool>)$1;
+		var static_ref = (Tuple<PhpMemberAttributes,bool>)$1;
 
 		$$ = new LambdaFunctionExpr(sourceUnit,
             @1, @$, GetHeadingEnd(@3), GetBodyStart(@6),
             GetScope(), currentNamespace,
-            static_doc_ref.Item3, (List<FormalParam>)$2, (List<FormalParam>)$4,
+            static_ref.Item2, (List<FormalParam>)$2, (List<FormalParam>)$4,
             (List<Statement>)$7);
 
 		reductionsSink.LambdaFunctionReduced(this, (LambdaFunctionExpr)$$);
@@ -1756,10 +1744,10 @@ lambda_function_expression:
 ;
 
 lambda_function_head_:
-		T_FUNCTION	'('				{ $$ = new Tuple<PhpMemberAttributes,object,bool>(PhpMemberAttributes.None, $1, false); }
-	|	T_STATIC T_FUNCTION	'('		{ $$ = new Tuple<PhpMemberAttributes,object,bool>(PhpMemberAttributes.Static, $2, false); }
-	|	T_FUNCTION '&' '('			{ $$ = new Tuple<PhpMemberAttributes,object,bool>(PhpMemberAttributes.None, $1, true); }
-	|	T_STATIC T_FUNCTION '&' '('	{ $$ = new Tuple<PhpMemberAttributes,object,bool>(PhpMemberAttributes.Static, $2, true); }
+		T_FUNCTION	'('				{ $$ = new Tuple<PhpMemberAttributes,bool>(PhpMemberAttributes.None, false); }
+	|	T_STATIC T_FUNCTION	'('		{ $$ = new Tuple<PhpMemberAttributes,bool>(PhpMemberAttributes.Static, false); }
+	|	T_FUNCTION '&' '('			{ $$ = new Tuple<PhpMemberAttributes,bool>(PhpMemberAttributes.None, true); }
+	|	T_STATIC T_FUNCTION '&' '('	{ $$ = new Tuple<PhpMemberAttributes,bool>(PhpMemberAttributes.Static, true); }
 ;
 
 lambda_function_use_vars:
@@ -1947,7 +1935,7 @@ namespace_name_identifier:	// identifier + some keywords that should be used wit
 	|	T_RESOURCE_TYPE		{ $$ = CSharpNameToken(@1, (string)$1.Object); }
 	|	T_OBJECT_TYPE		{ $$ = CSharpNameToken(@1, (string)$1.Object); }
 	|	T_ARRAY				{ $$ = CSharpNameToken(@1, (string)$1.Object); }
-	|	T_ABSTRACT			{ $$ = CSharpNameToken(@1, ($1 as string) ?? "Abstract"); }	// needs PHPDoc handled differently to be sure the value of this token is its string
+	|	T_ABSTRACT			{ $$ = CSharpNameToken(@1, (string)$1.Object); }
 ;
 
 qualified_namespace_name_list:

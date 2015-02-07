@@ -91,7 +91,7 @@ namespace PHP.Core.Compiler.AST
 
             protected override void ReportUnreachable(BlockStmt node, Analyzer analyzer)
             {
-                if (node.Statements.Count > 0)
+                if (node.Statements.Any())
                     node.Statements[0].ReportUnreachable(analyzer);
                 else
                     base.ReportUnreachable(node, analyzer);
@@ -173,6 +173,23 @@ namespace PHP.Core.Compiler.AST
             internal override void Emit(EmptyStmt node, CodeGenerator codeGenerator)
             {
                 codeGenerator.MarkSequencePoint(node.Span);
+            }
+        }
+
+        #endregion
+
+        #region PHPDocStmt
+
+        [NodeCompiler(typeof(PHPDocStmt), Singleton = true)]
+        sealed class PHPDocStmtCompiler : StatementCompiler<PHPDocStmt>
+        {
+            internal override Statement Analyze(PHPDocStmt node, Analyzer analyzer)
+            {
+                return node;
+            }
+
+            internal override void Emit(PHPDocStmt node, CodeGenerator codeGenerator)
+            {   
             }
         }
 
@@ -439,7 +456,7 @@ namespace PHP.Core.Compiler.AST
         /// </summary>
         /// <param name="statements">List of statements to be analyzed.</param>
         /// <param name="analyzer">Current <see cref="Analyzer"/>.</param>
-        public static void Analyze(this List<Statement>/*!*/statements, Analyzer/*!*/ analyzer)
+        public static void Analyze(this IList<Statement>/*!*/statements, Analyzer/*!*/ analyzer)
         {
             Debug.Assert(statements != null);
             Debug.Assert(analyzer != null);
@@ -465,7 +482,7 @@ namespace PHP.Core.Compiler.AST
         /// <summary>
         /// Emits each <see cref="Statement"/> in given <paramref name="statements"/> list.
         /// </summary>
-        public static void Emit(this List<Statement> statements, CodeGenerator codeGenerator)
+        public static void Emit(this IEnumerable<Statement> statements, CodeGenerator codeGenerator)
         {
             if (statements != null)
             {
