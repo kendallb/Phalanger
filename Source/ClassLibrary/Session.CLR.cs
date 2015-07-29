@@ -542,7 +542,7 @@ namespace PHP.Library
             {
                 // find max integer key, add new array at the next position
                 var result = new PhpArray();
-                state[FindNewKey()] = result;
+                state[FindNewKey()] = PhpVariable.Unwrap(result);
                 return result;
             }
 
@@ -573,7 +573,7 @@ namespace PHP.Library
                     if (new_obj != null)
                     {
                         if (objref != null) objref.Value = new_obj;
-                        else state[name] = new_obj;
+                        else state[name] = PhpVariable.Unwrap(new_obj);
                     }
 
                     return wrappedarray;
@@ -611,7 +611,7 @@ namespace PHP.Library
                     if (objref != null)
                         objref.Value = newobj;
                     else
-                        state[name] = newobj;
+                        state[name] = PhpVariable.Unwrap(newobj);
 
                     return newobj;
                 }
@@ -623,7 +623,7 @@ namespace PHP.Library
             protected override DObject EnsureItemIsObjectOverride(ScriptContext context)
             {
                 var obj = PHP.Library.stdClass.CreateDefaultObject(context);
-                state[FindNewKey()] = obj;
+                state[FindNewKey()] = PhpVariable.Unwrap(obj);
                 return obj;
             }
 
@@ -647,7 +647,7 @@ namespace PHP.Library
             protected override PhpReference GetArrayItemRefOverride()
             {
                 var result = new PhpReference();
-                state[FindNewKey()] = result;
+                state[FindNewKey()] = PhpVariable.Unwrap(result);
                 return result;
             }
 
@@ -686,7 +686,7 @@ namespace PHP.Library
                     return (PhpReference)obj;
 
                 var objref = new PhpReference(ClrObject.WrapDynamic(obj));
-                state[name] = objref;
+                state[name] = PhpVariable.Unwrap(objref);
                 return objref;
             }
 
@@ -729,7 +729,7 @@ namespace PHP.Library
                 if (obj != null && obj is PhpReference)
                     ((PhpReference)obj).Value = value;
                 else
-                    state[name] = value;
+                    state[name] = PhpVariable.Unwrap(value);
             }
 
             protected override void SetArrayItemRefOverride(object key, PhpReference value)
