@@ -166,7 +166,7 @@ namespace PHP.Library.Data
 		/// <param name="convertTypes">Whether to convert resulting values to PHP types.</param>
 		/// <exception cref="ArgumentNullException">Argument is a <B>null</B> reference.</exception>
 		protected PhpDbResult(PhpDbConnection/*!*/ connection, IDataReader/*!*/ reader, string/*!*/ name, bool convertTypes)
-			: base(name)
+			: base(name, false)
 		{
 			if (connection == null)
 				throw new ArgumentNullException("connection");
