@@ -214,15 +214,6 @@ namespace PHP.Library.Data
 			this.currentFieldIndex = 0;
 		}
 
-		/// <summary>
-		/// Disposes the resource.
-		/// </summary>
-		protected override void FreeManaged()
-		{
-			base.FreeManaged();
-			if (this.reader != null) reader.Close();
-		}
-
 		internal void ReleaseConnection()
 		{
 			this.connection = null;
