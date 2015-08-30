@@ -17,7 +17,6 @@ using System.ComponentModel;
 
 using PHP.Core;
 using System.Diagnostics;
-using PHP.Core.Utilities;
 
 #if SILVERLIGHT
 using PHP.CoreCLR;
@@ -88,15 +87,17 @@ namespace PHP.Library
 		{
 			get
 			{
-			    var cultures = _cultures.Value;
-				if (cultures == null)
-					cultures = _cultures.Value = new CultureInfo[(int)Category.Time + 1];
+				if (_cultures == null)
+					_cultures = new CultureInfo[(int)Category.Time + 1];
 
-				return cultures;
+				return _cultures;
 			}
 		}
 
-        private static RequestStatic<CultureInfo[]> _cultures = new RequestStatic<CultureInfo[]>(() => _cultures.Value);
+#if !SILVERLIGHT
+		[ThreadStatic]
+#endif
+		private static CultureInfo[] _cultures;
 
 		static Locale()
 		{
@@ -105,7 +106,7 @@ namespace PHP.Library
 
 		private static void Clear()
 		{
-			_cultures.Value = null;
+			_cultures = null;
 		}
 
 		/// <summary>

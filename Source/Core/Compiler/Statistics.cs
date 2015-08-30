@@ -14,7 +14,6 @@ using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.IO;
-using PHP.Core.Utilities;
 
 namespace PHP.Core
 {
@@ -39,16 +38,17 @@ namespace PHP.Core
 
 		internal struct AST
 		{
-            private static RequestStatic<Dictionary<string, int>> _libraryCalls = new RequestStatic<Dictionary<string, int>>(() => _libraryCalls.Value);
-            private static RequestStatic<Dictionary<QualifiedName, int>> _unknownCalls = new RequestStatic<Dictionary<QualifiedName, int>>(() => _unknownCalls.Value);
-            private static RequestStatic<Dictionary<string, int>> _nodes = new RequestStatic<Dictionary<string, int>>(() => _nodes.Value);
+            [ThreadStatic]
+			private static Dictionary<string, int> libraryCalls;
+            [ThreadStatic]
+            private static Dictionary<QualifiedName, int> unknownCalls;
+            [ThreadStatic]
+            private static Dictionary<string, int> nodes;
 
 			[Conditional("DEBUG")]
 			public static void AddLibraryFunctionCall(string name, int paramCount)
 			{
-			    var libraryCalls = _libraryCalls.Value;
-				if (libraryCalls == null) 
-                    libraryCalls = _libraryCalls.Value = new Dictionary<string, int>();
+				if (libraryCalls == null) libraryCalls = new Dictionary<string, int>();
 
 				CollectionUtils.IncrementValue(libraryCalls, name + ';' + paramCount, 1);
 			}
@@ -56,9 +56,7 @@ namespace PHP.Core
 			[Conditional("DEBUG")]
 			public static void AddUnknownFunctionCall(QualifiedName name)
 			{
-                var unknownCalls = _unknownCalls.Value;
-                if (unknownCalls == null)
-                    unknownCalls = _unknownCalls.Value = new Dictionary<QualifiedName, int>();
+				if (unknownCalls == null) unknownCalls = new Dictionary<QualifiedName, int>();
 
 				CollectionUtils.IncrementValue(unknownCalls, name, 1);
 			}
@@ -66,18 +64,14 @@ namespace PHP.Core
 			[Conditional("DEBUG")]
 			public static void AddNode(string name)
 			{
-			    var nodes = _nodes.Value;
-			    if (nodes == null)
-                    nodes = _nodes.Value = new Dictionary<string, int>();
+				if (nodes == null) nodes = new Dictionary<string, int>();
 				CollectionUtils.IncrementValue(nodes, name, 1);
 			}
 
 			[Conditional("DEBUG")]
 			public static void DumpBasic(TextWriter output)
 			{
-                var libraryCalls = _libraryCalls.Value;
-                var unknownCalls = _unknownCalls.Value;
-                output.WriteLine("AST: LibraryFunctionCalls = {0}, UnknownFunctionCalls = {1}",
+				output.WriteLine("AST: LibraryFunctionCalls = {0}, UnknownFunctionCalls = {1}",
 				  (libraryCalls != null) ? libraryCalls.Count : 0,
 				  (unknownCalls != null) ? unknownCalls.Count : 0);
 			}
@@ -85,8 +79,7 @@ namespace PHP.Core
 			[Conditional("DEBUG")]
 			public static void DumpLibraryFunctionCalls(TextWriter output)
 			{
-                var libraryCalls = _libraryCalls.Value;
-                if (libraryCalls == null) return;
+				if (libraryCalls == null) return;
 
 				string[] keys = new string[libraryCalls.Count];
 				int[] values = new int[libraryCalls.Count];
@@ -106,8 +99,7 @@ namespace PHP.Core
 			[Conditional("DEBUG")]
 			public static void DumpUnknownFunctionCalls(TextWriter output)
 			{
-                var unknownCalls = _unknownCalls.Value;
-                if (unknownCalls == null) return;
+				if (unknownCalls == null) return;
 
 				QualifiedName[] names = new QualifiedName[unknownCalls.Count];
 				unknownCalls.Keys.CopyTo(names, 0);
@@ -123,7 +115,6 @@ namespace PHP.Core
 			[Conditional("DEBUG")]
 			public static void DumpNodes(TextWriter output)
 			{
-			    var nodes = _nodes.Value;
 				if (nodes == null) return;
 
 				string[] keys = new string[nodes.Count];

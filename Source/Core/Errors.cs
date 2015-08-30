@@ -10,7 +10,6 @@
 
 */
 
-using PHP.Core.Utilities;
 using System;
 using System.Collections;
 using System.IO;
@@ -583,7 +582,8 @@ namespace PHP.Core
         /// <summary>
         /// Delegate used to catch any thrown PHP exception. Used in compile time to catch PHP runtime exceptions.
         /// </summary>
-        internal static RequestStatic<Action<PhpError, string>> ThrowCallbackOverride = new RequestStatic<Action<PhpError, string>>(() => ThrowCallbackOverride.Value);
+        [ThreadStatic]
+        internal static Action<PhpError, string> ThrowCallbackOverride = null;
 
         /// <summary>
         /// Reports a PHP error. 
@@ -592,9 +592,9 @@ namespace PHP.Core
         /// <param name="message">The error message.</param>    
         public static void Throw(PhpError error, string message)
         {
-            if (ThrowCallbackOverride.Value != null)
+            if (ThrowCallbackOverride != null)
             {
-                ThrowCallbackOverride.Value(error, message);
+                ThrowCallbackOverride(error, message);
                 return;
             }
 

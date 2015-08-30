@@ -21,7 +21,6 @@ using System.Collections.Generic;
 using PHP.Core;
 using PHP.Core.Emit;
 using PHP.Core.Reflection;
-using PHP.Core.Utilities;
 
 #if SILVERLIGHT
 using PHP.CoreCLR;
@@ -321,12 +320,14 @@ namespace PHP.Core
 		/// <summary>
 		/// Auxiliary variable holding the current level of indentation while printing a variable.
 		/// </summary>
-	    internal static int PrintIndentationLevel
-	    {
-	        get { return _printIndentationLevel.Value; }
-	        set { _printIndentationLevel.Value = value; }
-	    }
-        internal static RequestStatic<int> _printIndentationLevel = new RequestStatic<int>(() => _printIndentationLevel.Value);
+#if SILVERLIGHT
+        //TODO: Silverlight doesn't have ThreadStatic, it should be done in different way... now output is just a normal static field
+        internal static int PrintIndentationLevel = 0;
+		
+#else
+		[ThreadStatic]
+		internal static int PrintIndentationLevel = 0;
+#endif
 
 		/// <summary>
 		/// Writes indentation spaces to <see cref="TextWriter"/> according to <see cref="PrintIndentationLevel"/>.
@@ -334,7 +335,7 @@ namespace PHP.Core
 		/// <param name="output">The <see cref="TextWriter"/> where to write spaces.</param>
 		internal static void PrintIndentation(TextWriter output)
 		{
-		    for (int i = 0, n = PrintIndentationLevel; i < n; i++)
+			for (int i = 0; i < PrintIndentationLevel; i++)
 			{
 				output.Write(' ');
 				output.Write(' ');

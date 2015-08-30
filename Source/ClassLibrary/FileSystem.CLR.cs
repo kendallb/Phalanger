@@ -26,7 +26,6 @@ using System.Runtime.CompilerServices;
 using PHP.Core;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using PHP.Core.Utilities;
 
 #if SILVERLIGHT
 using PHP.CoreCLR;
@@ -42,16 +41,18 @@ namespace PHP.Library
 	{
 		#region Constructors and Thread Static Stuff
 
-		/// <summary>The most recent <c>stat()</c> result (<c>stat()</c> of the <see cref="_statCacheUrl"/> file).</summary>
-        private static RequestStatic<StatStruct> _statCache = new RequestStatic<StatStruct>(() => _statCache.Value);
+		/// <summary>The most recent <c>stat()</c> result (<c>stat()</c> of the <see cref="statCacheUrl"/> file).</summary>
+		[ThreadStatic]
+		private static StatStruct statCache;
 
 		/// <summary>The absolute path of the last <c>stat()</c> operation.</summary>
-        private static RequestStatic<string> _statCacheUrl = new RequestStatic<string>(() => _statCacheUrl.Value);
+		[ThreadStatic]
+		private static string statCacheUrl = null;
 
 		private static void Clear()
 		{
-			_statCache.Value = new StatStruct();
-			_statCacheUrl.Value = null;
+			statCache = new StatStruct();
+			statCacheUrl = null;
 		}
 
 		#endregion
@@ -157,7 +158,7 @@ namespace PHP.Library
         {
             // Try to hit the cache first
             url = PhpPath.GetUrl(path);
-            return (url == _statCacheUrl.Value);
+            return (url == statCacheUrl);
         }
 
         /// <summary>
@@ -173,8 +174,8 @@ namespace PHP.Library
             StatStruct stat = wrapper.Stat(path, quiet ? StreamStatOptions.Quiet : StreamStatOptions.Empty, StreamContext.Default, false);
             if (stat.st_size >= 0)
             {
-                _statCacheUrl.Value = url;
-                _statCache.Value = stat;
+                statCacheUrl = url;
+                statCache = stat;
                 return true;
             }
             else
@@ -187,7 +188,7 @@ namespace PHP.Library
 		/// </summary>
 		/// <param name="path">The path (absolute or relative or an URL) to the file or directory to stat.</param>
 		/// <param name="quiet"><c>true</c> to suppress the display of error messages (for example for <c>exists()</c>).</param>
-		/// <returns><c>true</c> if the <see cref="_statCache"/> contains a valid 
+		/// <returns><c>true</c> if the <see cref="statCache"/> contains a valid 
 		/// stat structure for the given URL, <c>false</c> on an error.</returns>
 		internal static bool StatInternal(string path, bool quiet)
 		{
@@ -231,7 +232,7 @@ namespace PHP.Library
 		{
 			if (StatInternal(path, false))
 			{
-				return BuildStatArray(_statCache.Value);
+				return BuildStatArray(statCache);
 			}
 			return null;
 		}
@@ -481,7 +482,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return null;
-			FileModeFlags mode = (FileModeFlags)_statCache.Value.st_mode & FileModeFlags.FileTypeMask;
+			FileModeFlags mode = (FileModeFlags)statCache.st_mode & FileModeFlags.FileTypeMask;
 
 			switch (mode)
 			{
@@ -513,7 +514,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return -1;
-			return unchecked((int)_statCache.Value.st_atime);
+			return unchecked((int)statCache.st_atime);
 		}
 
 		/// <summary>
@@ -536,7 +537,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return -1;
-			return unchecked((int)_statCache.Value.st_ctime);
+			return unchecked((int)statCache.st_ctime);
 		}
 
 		/// <summary>
@@ -553,7 +554,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return -1;
-			return (int)_statCache.Value.st_gid;
+			return (int)statCache.st_gid;
 		}
 
 		/// <summary>
@@ -570,7 +571,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return -1;
-			return (int)_statCache.Value.st_ino;
+			return (int)statCache.st_ino;
 		}
 
 		/// <summary>
@@ -589,7 +590,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return -1;
-			return unchecked((int)_statCache.Value.st_mtime);
+			return unchecked((int)statCache.st_mtime);
 		}
 
 		/// <summary>
@@ -603,7 +604,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return -1;
-			return (int)_statCache.Value.st_uid;
+			return (int)statCache.st_uid;
 		}
 
 		/// <summary>
@@ -617,7 +618,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return -1;
-			return (int)_statCache.Value.st_mode;
+			return (int)statCache.st_mode;
 		}
 
 		/// <summary>
@@ -639,7 +640,7 @@ namespace PHP.Library
             {
                 string url;
                 if (StatInternalTryCache(path, out url))
-                    return _statCache.Value.st_size;
+                    return statCache.st_size;
 
                 // we are not calling full stat(), it is slow
                 return FileStreamWrapper.HandleNewFileSystemInfo(-1, path, (p) => FileSystemUtils.FileSize(new FileInfo(p)));
@@ -649,7 +650,7 @@ namespace PHP.Library
             
             //bool ok = StatInternal(path, false);
             //if (!ok) return -1;
-            //return _statCache.Value.st_size;
+            //return statCache.st_size;
 		}
 
 		#endregion
@@ -669,7 +670,7 @@ namespace PHP.Library
             {
                 string url;
                 if (StatInternalTryCache(path, out url))
-                    return ((FileModeFlags)_statCache.Value.st_mode & FileModeFlags.Directory) != 0;
+                    return ((FileModeFlags)statCache.st_mode & FileModeFlags.Directory) != 0;
 
                 // we can't just call Directory.Exists since we have to throw warnings
                 // also we are not calling full stat(), it is slow
@@ -681,7 +682,7 @@ namespace PHP.Library
             //bool ok = !string.IsNullOrEmpty(path) && StatInternal(path, false); // do not throw warning if path is null or empty
             //if (!ok) return false;
 
-            //return ((FileModeFlags)_statCache.Value.st_mode & FileModeFlags.Directory) > 0;
+            //return ((FileModeFlags)statCache.st_mode & FileModeFlags.Directory) > 0;
 		}
 
 		/// <summary>
@@ -694,7 +695,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return false;
-            return ((FileModeFlags)_statCache.Value.st_mode & FileModeFlags.Execute) > 0;
+			return ((FileModeFlags)statCache.st_mode & FileModeFlags.Execute) > 0;
 		}
 
 		/// <summary>
@@ -711,7 +712,7 @@ namespace PHP.Library
             {
                 string url;
                 if (StatInternalTryCache(path, out url))
-                    return ((FileModeFlags)_statCache.Value.st_mode & FileModeFlags.File) != 0;
+                    return ((FileModeFlags)statCache.st_mode & FileModeFlags.File) != 0;
 
                 // we can't just call File.Exists since we have to throw warnings
                 // also we are not calling full stat(), it is slow
@@ -745,7 +746,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return false;
-            return ((FileModeFlags)_statCache.Value.st_mode & FileModeFlags.Read) > 0;
+			return ((FileModeFlags)statCache.st_mode & FileModeFlags.Read) > 0;
 		}
 
 		/// <summary>
@@ -770,7 +771,7 @@ namespace PHP.Library
 		{
 			bool ok = StatInternal(path, false);
 			if (!ok) return false;
-            return ((FileModeFlags)_statCache.Value.st_mode & FileModeFlags.Write) > 0;
+			return ((FileModeFlags)statCache.st_mode & FileModeFlags.Write) > 0;
 		}
 
 		#endregion

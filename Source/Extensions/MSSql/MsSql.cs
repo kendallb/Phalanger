@@ -17,7 +17,6 @@ using System.Text;
 using System.Data.SqlClient;
 
 using PHP.Core;
-using PHP.Core.Utilities;
 
 namespace PHP.Library.Data
 {
@@ -91,23 +90,23 @@ namespace PHP.Library.Data
 		{
 			get
 			{
-			    var manager = _manager.Value;
-				if (manager == null) 
-                    manager = _manager.Value = new SqlConnectionManager();
-				return manager;
+				if (_manager == null) _manager = new SqlConnectionManager();
+				return _manager;
 			}
 		}
-        private static RequestStatic<SqlConnectionManager> _manager = new RequestStatic<SqlConnectionManager>(() => _manager.Value);
+		[ThreadStatic]
+		private static SqlConnectionManager _manager;
 
-        private static RequestStatic<string> _failConnectErrorMessage = new RequestStatic<string>(() => _failConnectErrorMessage.Value, "");
+		[ThreadStatic]
+		private static string failConnectErrorMessage = "";
 
 		/// <summary>
 		/// Clears thread static fields at the end of each request.
 		/// </summary>
 		private static void Clear()
 		{
-			_manager.Value = null;
-            _failConnectErrorMessage.Value = "";
+			_manager = null;
+			failConnectErrorMessage = "";
 		}
 
 		static MsSql()
@@ -117,7 +116,7 @@ namespace PHP.Library.Data
 
 		private static void UpdateConnectErrorInfo(PhpSqlDbConnection connection)
 		{
-            _failConnectErrorMessage.Value = connection.GetLastErrorMessage();
+			failConnectErrorMessage = connection.GetLastErrorMessage();
 		}
 
 		#endregion
@@ -663,7 +662,7 @@ namespace PHP.Library.Data
 			PhpSqlDbConnection last_connection = (PhpSqlDbConnection)manager.GetLastConnection();
 
 			if (last_connection == null)
-                return _failConnectErrorMessage.Value;
+				return failConnectErrorMessage;
 
 			return last_connection.GetLastErrorMessage();
 		}

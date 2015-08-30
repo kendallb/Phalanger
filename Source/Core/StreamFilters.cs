@@ -15,7 +15,6 @@ using System;
 using System.Text;
 using System.Diagnostics;
 using System.Collections;
-using PHP.Core.Utilities;
 
 #if SILVERLIGHT
 using PHP.CoreCLR;
@@ -379,22 +378,29 @@ namespace PHP.Core
 		{
 			get
 			{
-				return _userFilters.Value;
+				return userFilters;
 				// EX: store userfilters in ScriptContext.
 			}
 			set
 			{
-				_userFilters.Value = value;
+				userFilters = value;
 			}
 		}
 
 		/// <summary>The list of (script-specific) user filters.</summary>
-        private static RequestStatic<Hashtable> _userFilters = new RequestStatic<Hashtable>(() => _userFilters.Value);
 #if SILVERLIGHT
+        //TODO: Silverlight doesn't have ThreadStatic, it should be done it in different way... now output is just a normal field
+		private static Hashtable userFilters = null;// { get { return tsuserFilters.Value; } set { tsuserFilters.Value = value; } }
+		//private static ThreadStatic<Hashtable> tsuserFilters = new ThreadStatic<Hashtable>("PhpFilter.userFilters");
+
         /// <summary>The list of built-in filters.</summary>
         //TODO: It should be synchronized version of ArrayList here.
         private static ArrayList systemFilters = new ArrayList();
+
 #else
+		[ThreadStatic]
+		private static Hashtable userFilters = null;
+
         /// <summary>The list of built-in filters.</summary>
 		private static ArrayList systemFilters = ArrayList.Synchronized(new ArrayList());
 

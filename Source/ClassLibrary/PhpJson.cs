@@ -38,7 +38,6 @@ using System.Runtime.Serialization.Formatters;
 using PHP.Core;
 using PHP.Core.Reflection;
 using PHP.Library;
-using PHP.Core.Utilities;
 
 #if SILVERLIGHT
 using PHP.CoreCLR;
@@ -82,7 +81,7 @@ namespace PHP.Library
             // clear the last error variable every request
             RequestContext.RequestBegin += () =>
                 {
-                    PhpJson._lastError.Value = JsonLastError.JSON_ERROR_NONE;
+                    PhpJson.LastError = JsonLastError.JSON_ERROR_NONE;
                 };
         }
 
@@ -270,11 +269,12 @@ namespace PHP.Library
         [ImplementsFunction("json_last_error")]
         public static int GetLastError()
         {
-            return (int)_lastError.Value;
+            return (int)LastError;
         }
 
-        internal static RequestStatic<JsonLastError> _lastError = new RequestStatic<JsonLastError>(() => _lastError.Value, JsonLastError.JSON_ERROR_NONE);
- 
+        [ThreadStatic]
+        internal static JsonLastError LastError = JsonLastError.JSON_ERROR_NONE;
+
 #endif
 		#endregion
     }
@@ -844,11 +844,11 @@ namespace PHP.Library
                 }
                 catch (Exception)
                 {
-                    PhpJson._lastError.Value = PhpJson.JsonLastError.JSON_ERROR_SYNTAX;
+                    PhpJson.LastError = PhpJson.JsonLastError.JSON_ERROR_SYNTAX;
                     return null;
                 }
 
-                PhpJson._lastError.Value = PhpJson.JsonLastError.JSON_ERROR_NONE;
+                PhpJson.LastError = PhpJson.JsonLastError.JSON_ERROR_NONE;
                 return parser.Result;
             }
         }

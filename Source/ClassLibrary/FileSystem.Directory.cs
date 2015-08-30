@@ -22,8 +22,6 @@ using System.Runtime.CompilerServices;
 
 using PHP.Core;
 using PHP.Core.Reflection;
-using PHP.Core.Utilities;
-
 #if SILVERLIGHT
 using PHP.CoreCLR;
 #endif
@@ -306,8 +304,8 @@ namespace PHP.Library
 
         protected override void FreeManaged()
         {
-            if (object.ReferenceEquals(this, PhpDirectory._lastDirHandle.Value))
-                PhpDirectory._lastDirHandle.Value = null;
+            if (object.ReferenceEquals(this, PhpDirectory.lastDirHandle))
+                PhpDirectory.lastDirHandle = null;
         }
 
 		public readonly string[] Listing;
@@ -403,7 +401,8 @@ namespace PHP.Library
         /// <summary>
         /// Last handle opened by <c>opendir</c>.
         /// </summary>
-        internal static RequestStatic<PhpResource> _lastDirHandle = new RequestStatic<PhpResource>(() => _lastDirHandle.Value);
+        [ThreadStatic]
+        internal static PhpResource lastDirHandle;
 
 		/// <summary>Returns a directory handle to be used in subsequent 
 		/// <c>readdir()</c>, <c>rewinddir()</c> and <c>closedir()</c> calls.</summary>
@@ -427,14 +426,14 @@ namespace PHP.Library
 		[return: CastToFalse]
 		public static PhpResource Open(string directory)
 		{
-            _lastDirHandle.Value = null;
+            lastDirHandle = null;
 
 			StreamWrapper wrapper;
 			if (!PhpStream.ResolvePath(ref directory, out wrapper, CheckAccessMode.Directory, CheckAccessOptions.Empty))
 				return null;
 
 			string[] listing = wrapper.Listing(directory, 0, null);
-            return (listing != null) ? (_lastDirHandle.Value = new DirectoryListing(listing)) : null;
+			return (listing != null) ? (lastDirHandle = new DirectoryListing(listing)) : null;
 		}
 
         /// <summary>
@@ -444,7 +443,7 @@ namespace PHP.Library
         [return: CastToFalse]
         public static string Read()
         {
-            return Read(PhpDirectory._lastDirHandle.Value);
+            return Read(PhpDirectory.lastDirHandle);
         }
 
 		/// <summary>
@@ -473,7 +472,7 @@ namespace PHP.Library
         [ImplementsFunction("rewinddir")]
         public static void Rewind()
         {
-            Rewind(PhpDirectory._lastDirHandle.Value);
+            Rewind(PhpDirectory.lastDirHandle);
         }
 
 		/// <summary>
@@ -499,7 +498,7 @@ namespace PHP.Library
         [ImplementsFunction("closedir")]
         public static void Close()
         {
-            Close(PhpDirectory._lastDirHandle.Value);
+            Close(PhpDirectory.lastDirHandle);
         }
 
 		/// <summary>

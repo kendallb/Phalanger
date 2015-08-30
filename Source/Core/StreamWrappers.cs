@@ -20,7 +20,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using PHP.Core;
 using System.Runtime.InteropServices;
-using PHP.Core.Utilities;
 #if SILVERLIGHT
 using PHP.CoreCLR;
 #endif
@@ -1243,10 +1242,9 @@ namespace PHP.Core
         {
             get
             {
-                var input = _input.Value;
                 if (input == null)
                 {
-                    input = _input.Value = new NativeStream(OpenScriptInput(), null,
+                    input = new NativeStream(OpenScriptInput(), null,
                       StreamAccessOptions.Read | StreamAccessOptions.Persistent, "php://input", StreamContext.Default);
                     input.IsReadBuffered = false;
                     // EX: cache this as a persistent stream
@@ -1255,7 +1253,8 @@ namespace PHP.Core
             }
         }
 
-        private static RequestStatic<PhpStream> _input = new RequestStatic<PhpStream>(() => _input.Value);
+        [ThreadStatic]
+        private static PhpStream input = null;
 #endif
 
         /// <summary>
@@ -1270,12 +1269,11 @@ namespace PHP.Core
             get
             {
                 Stream currentScriptOutput = OpenScriptOutput();
-                var output = _output.Value;
                 if (bytesink != currentScriptOutput)
                 {
                     bytesink = currentScriptOutput;
                     if (output != null) output.Close();
-                    output = _output.Value = new NativeStream(currentScriptOutput, null,
+                    output = new NativeStream(currentScriptOutput, null,
                       StreamAccessOptions.Write | StreamAccessOptions.Persistent, "php://output", StreamContext.Default);
                     output.IsWriteBuffered = false;
                     // EX: cache this as a persistent stream
@@ -1283,7 +1281,13 @@ namespace PHP.Core
                 return output;
             }
         }
-        private static RequestStatic<PhpStream> _output = new RequestStatic<PhpStream>(() => _output.Value);
+#if SILVERLIGHT
+		//TODO: Silverlight doesn't have ThreadStatic, it should be done in different way... now output is just a normal static field
+		private static PhpStream output;
+#else
+        [ThreadStatic]
+        private static PhpStream output = null;
+#endif
         private static Stream bytesink = null;
 
 #if !SILVERLIGHT

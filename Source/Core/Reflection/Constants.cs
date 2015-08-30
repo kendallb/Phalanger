@@ -666,7 +666,7 @@ namespace PHP.Core.Reflection
 				FieldBuilder fb = type_builder.DefineField(name, field_type, field_attrs);
 
 				// [EditorBrowsable(Never)] for user convenience - not on silverlight
-                // RequestStatic for deferred constants
+                // [ThreadStatic] for deferred constants
 #if !SILVERLIGHT
 				if (IsExported)
 					fb.SetCustomAttribute(AttributeBuilders.EditorBrowsableNever);

@@ -9,13 +9,11 @@
  You must not remove this notice from this software.
 
 */
-
-using PHP.Core.Utilities;
 using System;
 using System.Text;
 using System.Collections;
 using System.ComponentModel;
-using System.Globalization;
+
 using PHP.Core;
 
 #if SILVERLIGHT
@@ -43,13 +41,15 @@ namespace PHP.Library
 		{
 			get
 			{
-			    var generator = _generator.Value;
-				if (generator == null)
-					generator = _generator.Value = new Random(unchecked((int)System.DateTime.Now.ToFileTime()));
-				return generator;
+				if (_generator == null)
+					_generator = new Random(unchecked((int)System.DateTime.Now.ToFileTime()));
+				return _generator;
 			}
 		}
-        private static RequestStatic<Random> _generator = new RequestStatic<Random>(() => _generator.Value);
+#if !SILVERLIGHT
+		[ThreadStatic]
+#endif
+		private static Random _generator;
 
 		/// <summary>
 		/// Gets an initialized Mersenne Twister random number generator associated with the current thread.
@@ -58,13 +58,15 @@ namespace PHP.Library
 		{
 			get
 			{
-			    var mtGenerator = _mtGenerator.Value;
-				if (mtGenerator == null)
-					mtGenerator = _mtGenerator.Value = new MersenneTwister(unchecked((uint)System.DateTime.Now.ToFileTime()));
-				return mtGenerator;
+				if (_mtGenerator == null)
+					_mtGenerator = new MersenneTwister(unchecked((uint)System.DateTime.Now.ToFileTime()));
+				return _mtGenerator;
 			}
 		}
-        private static RequestStatic<MersenneTwister> _mtGenerator = new RequestStatic<MersenneTwister>(() => _mtGenerator.Value);
+#if !SILVERLIGHT
+		[ThreadStatic]
+#endif
+		private static MersenneTwister _mtGenerator;
 
 		/// <summary>
 		/// Registers <see cref="ClearGenerators"/> routine to be called on request end.
@@ -79,11 +81,10 @@ namespace PHP.Library
 		/// </summary>
 		private static void ClearGenerators()
 		{
-			_generator.Value = null;
+			_generator = null;
 
-		    var mtGenerator = _mtGenerator.Value;
-			if (mtGenerator != null)
-				mtGenerator.Seed(unchecked((uint)System.DateTime.Now.ToFileTime()));
+			if (_mtGenerator != null)
+				_mtGenerator.Seed(unchecked((uint)System.DateTime.Now.ToFileTime()));
 		}
 
 		#endregion
@@ -194,7 +195,7 @@ namespace PHP.Library
         [ImplementsFunction("srand")]
         public static void Seed()
         {
-            _generator.Value = new Random();
+            _generator = new Random();
         }
 
         /// <summary>
@@ -204,7 +205,7 @@ namespace PHP.Library
 		[ImplementsFunction("srand")]
 		public static void Seed(int seed)
 		{
-			_generator.Value = new Random(seed);
+			_generator = new Random(seed);
 		}
 
         /// <summary>
@@ -295,7 +296,7 @@ namespace PHP.Library
 		/// Generates a pseudo-random number using linear congruential generator in the range of (0,1).
 		/// </summary>
 		/// <remarks>
-		/// This method uses the Framwork <see cref="System.Random"/> generator
+		/// This method uses the Framwork <see cref="Random"/> generator
 		/// which may or may not be the same generator as the PHP one (L(CG(2^31 - 85),CG(2^31 - 249))).
 		/// </remarks>
 		/// <returns></returns>

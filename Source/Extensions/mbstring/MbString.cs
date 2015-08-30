@@ -52,7 +52,6 @@ using System.Data.SqlClient;
 
 using PHP.Core;
 using System.Collections.Generic;
-using PHP.Core.Utilities;
 
 namespace PHP.Library.Strings
 {
@@ -238,11 +237,11 @@ namespace PHP.Library.Strings
         {
             get
             {
-                return _internalEncoding.Value ?? Configuration.Application.Globalization.PageEncoding;
+                return _internalEncoding ?? Configuration.Application.Globalization.PageEncoding;
             }
             private set
             {
-                _internalEncoding.Value = value;
+                _internalEncoding = value;
             }
         }
         /// <summary>
@@ -255,7 +254,8 @@ namespace PHP.Library.Strings
                 return InternalEncoding.WebName;
             }
         }
-        private static RequestStatic<Encoding> _internalEncoding = new RequestStatic<Encoding>(() => _internalEncoding.Value);
+        [ThreadStatic]
+        private static Encoding _internalEncoding = null;
 
         /// <summary>
         /// Get encoding used by default in the extension.
@@ -323,11 +323,11 @@ namespace PHP.Library.Strings
         {
             get
             {
-                return _regexEncoding.Value ?? Configuration.Application.Globalization.PageEncoding;
+                return _regexEncoding ?? Configuration.Application.Globalization.PageEncoding;
             }
             private set
             {
-                _regexEncoding.Value = value;
+                _regexEncoding = value;
             }
         }
         /// <summary>
@@ -340,7 +340,8 @@ namespace PHP.Library.Strings
                 return RegexEncoding.WebName;
             }
         }
-        private static RequestStatic<Encoding> _regexEncoding = new RequestStatic<Encoding>(() => _regexEncoding.Value);
+        [ThreadStatic]
+        private static Encoding _regexEncoding = null;
 
         /// <summary>
         /// Get encoding used by regex in the extension.
@@ -426,9 +427,11 @@ namespace PHP.Library.Strings
             POSIXExtendedRegex,
         }
 
-        private static RequestStatic<RegexOptions> _regexOptions = new RequestStatic<RegexOptions>(() => _regexOptions.Value, RegexOptions.DotMatchesNewLine | RegexOptions.ConvertMatchBeginEnd);
+        [ThreadStatic]
+        private static RegexOptions _regexOptions = RegexOptions.DotMatchesNewLine | RegexOptions.ConvertMatchBeginEnd;
 
-        private static RequestStatic<RegexSyntaxModes> _regexSyntaxMode = new RequestStatic<RegexSyntaxModes>(() => _regexSyntaxMode.Value, RegexSyntaxModes.POSIXExtendedRegex);
+        [ThreadStatic]
+        private static RegexSyntaxModes _regexSyntaxMode = RegexSyntaxModes.POSIXExtendedRegex;
 
         /// <summary>
         /// Determines if given combination of options is enabled.
@@ -437,7 +440,7 @@ namespace PHP.Library.Strings
         /// <returns>True if given option mask is enabled.</returns>
         private static bool OptionEnabled(RegexOptions opt)
         {
-            return (_regexOptions.Value & opt) != 0;
+            return (_regexOptions & opt) != 0;
         }
         /// <summary>
         /// Determines if given syntax mode is set.
@@ -446,7 +449,7 @@ namespace PHP.Library.Strings
         /// <returns>True if given syntax mode is enabled.</returns>
         private static bool OptionEnabled(RegexSyntaxModes opt)
         {
-            return (_regexSyntaxMode.Value == opt);
+            return (_regexSyntaxMode == opt);
         }
 
         #endregion
@@ -549,8 +552,8 @@ namespace PHP.Library.Strings
             }
 
             //
-            _regexOptions.Value = newRegexOptions;
-            _regexSyntaxMode.Value = newRegexSyntaxModes;
+            _regexOptions = newRegexOptions;
+            _regexSyntaxMode = newRegexSyntaxModes;
 
             return GetRegexOptions();
         }
@@ -1265,15 +1268,16 @@ namespace PHP.Library.Strings
         {
             get
             {
-                return _mailLanguage.Value ?? "uni";
+                return _mailLanguage ?? "uni";
             }
             set
             {
-                _mailLanguage.Value = value;  // TODO: check the value
+                _mailLanguage = value;  // TODO: check the value
             }
 
         }
-        private static RequestStatic<string> _mailLanguage = new RequestStatic<string>();*/
+        [ThreadStatic]
+        private static string _mailLanguage = null;*/
 
         /// <summary>
         /// Get language used by mail functions.

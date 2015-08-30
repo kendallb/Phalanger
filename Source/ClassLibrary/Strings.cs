@@ -31,7 +31,6 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.ComponentModel;
-using PHP.Core.Utilities;
 
 #if SILVERLIGHT
 using PHP.CoreCLR;
@@ -192,17 +191,20 @@ namespace PHP.Library
     {
         #region Character map
 
-        private static RequestStatic<CharMap> _charmap = new RequestStatic<CharMap>(() => _charmap.Value);
+#if !SILVERLIGHT
+        [ThreadStatic]
+#endif
+        private static CharMap _charmap;
 
         /// <summary>
         /// Get clear <see cref="CharMap"/> to be used by current thread. <see cref="_charmap"/>.
         /// </summary>
         internal static CharMap InitializeCharMap()
         {
-            CharMap result = _charmap.Value;
+            CharMap result = _charmap;
 
             if (result == null)
-                _charmap.Value = result = new CharMap(0x0800);
+                _charmap = result = new CharMap(0x0800);
             else
                 result.ClearAll();
 
@@ -4302,21 +4304,22 @@ namespace PHP.Library
             {
                 get
                 {
-                    var currentContext = _currentContext.Value;
-                    if (currentContext == null) 
-                        currentContext = _currentContext.Value = new TokenizerContext();
+                    if (currentContext == null) currentContext = new TokenizerContext();
                     return currentContext;
                 }
             }
 
-            private static RequestStatic<TokenizerContext> _currentContext = new RequestStatic<TokenizerContext>(() => _currentContext.Value);
+#if !SILVERLIGHT
+            [ThreadStatic]
+#endif
+            private static TokenizerContext currentContext;
 
             /// <summary>
             /// Clears thread static field. Called on request end.
             /// </summary>
             public static void Clear()
             {
-                _currentContext.Value = null;
+                currentContext = null;
             }
 
             /// <summary>
