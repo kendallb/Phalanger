@@ -58,13 +58,11 @@ namespace PHP.Core.Parsers
 
 	#endregion
 
-	public partial class Parser
+	public partial class Parser : ICommentsSink, IScannerHandler
 	{
 		#region Reductions Sinks
 
-        public static readonly IReductionsSink/*!*/ NullReductionSink = new _NullReductionsSink();
-
-		private sealed class _NullReductionsSink : IReductionsSink
+        private sealed class NullReductionsSink : IReductionsSink
 		{
 			void IReductionsSink.InclusionReduced(Parser/*!*/ parser, IncludingEx/*!*/ incl)
 			{
@@ -145,11 +143,6 @@ namespace PHP.Core.Parsers
 		{
 			get { return (int)Tokens.ERROR; }
 		}
-
-        protected override bool IsDocCommentToken(int tok)
-        {
-            return (tok == (int)Tokens.T_DOC_COMMENT);
-        }
 
         protected override Text.Span CombinePositions(Text.Span first, Text.Span last)
         {
@@ -235,11 +228,11 @@ namespace PHP.Core.Parsers
             this.errors = errors;
             this.features = features;
             this.reader = reader;
-            this.reductionsSink = reductionsSink ?? NullReductionSink;
+            this.reductionsSink = reductionsSink ?? new NullReductionsSink();
             InitializeFields();
 
-            this.scanner = new Scanner(reader, sourceUnit, errors, (reductionsSink as ICommentsSink) ?? (sourceUnit as ICommentsSink), features, positionShift);
-			this.scanner.CurrentLexicalState = initialLexicalState;
+            this.scanner = new Scanner(reader, sourceUnit, errors, this, this, features, positionShift) { CurrentLexicalState = initialLexicalState };
+            this.scanner.CurrentLexicalState = initialLexicalState;
 			this.currentScope = new Scope(1); // starts assigning scopes from 2 (1 is reserved for prepended inclusion)
 
 			this.unicodeSemantics = (features & LanguageFeatures.UnicodeSemantics) != 0;
@@ -257,9 +250,9 @@ namespace PHP.Core.Parsers
 
 		private void InitializeFields()
 		{
-			strBufStack.Clear();
-            //docCommentStack = null;
-			condLevel = 0;
+            InitializeCommentSink();
+            strBufStack.Clear();
+            condLevel = 0;
 
             Debug.Assert(sourceUnit != null);
 
@@ -268,9 +261,9 @@ namespace PHP.Core.Parsers
                 this.currentNamespace = new AST.NamespaceDecl(default(Text.Span), sourceUnit.CurrentNamespace.Value.ToStringList(), true);
 
                 // add aliases into the namespace:
-                if (sourceUnit.Aliases.Count > 0)
-                    foreach (var alias in sourceUnit.Aliases)
-                        this.currentNamespace.Aliases.Add(alias.Key, alias.Value);
+                if (sourceUnit.Naming.Aliases != null)
+                    foreach (var alias in sourceUnit.Naming.Aliases)
+                        this.currentNamespace.Naming.AddAlias(alias.Key, alias.Value);
             }
             else
             {
@@ -280,7 +273,9 @@ namespace PHP.Core.Parsers
 
 		private void ClearFields()
 		{
-			scanner = null;
+            ClearCommentSink();
+            
+            scanner = null;
 			features = 0;
 			errors = null;
 			sourceUnit = null;
@@ -568,7 +563,7 @@ namespace PHP.Core.Parsers
         {
             QualifiedName? fallbackQName;
 
-            TranslateFallbackQualifiedName(ref qname, out fallbackQName);
+            TranslateFallbackQualifiedName(ref qname, out fallbackQName, this.CurrentNaming.FunctionAliases);
             return new DirectFcnCall(pos, qname, fallbackQName, qnamePosition, args, typeArgs);
         }
 
@@ -584,7 +579,7 @@ namespace PHP.Core.Parsers
             }
             else
             {
-                TranslateFallbackQualifiedName(ref qname, out fallbackQName);
+                TranslateFallbackQualifiedName(ref qname, out fallbackQName, this.CurrentNaming.ConstantAliases);
             }
             
             return new GlobalConstUse(pos, qname, fallbackQName);
@@ -597,9 +592,20 @@ namespace PHP.Core.Parsers
         /// <param name="qname"></param>
         /// <param name="fallbackQName"></param>
         /// <remarks>Used for handling global function call and global constant use.
+        /// <param name="aliases">Optional. Dictionary of aliases for the <paramref name="qname"/>.</param>
         /// In PHP entity in current namespace is tried first, then it falls back to global namespace.</remarks>
-        private void TranslateFallbackQualifiedName(ref QualifiedName qname, out QualifiedName? fallbackQName)
+        private void TranslateFallbackQualifiedName(ref QualifiedName qname, out QualifiedName? fallbackQName, Dictionary<string, QualifiedName> aliases)
         {
+            // aliasing
+            QualifiedName tmp;
+            if (qname.IsSimpleName && aliases != null && aliases.TryGetValue(qname.Name.Value, out tmp))
+            {
+                qname = tmp;
+                fallbackQName = null;
+                return;
+            }
+
+            //
             qname = TranslateNamespace(qname);
 
             if (!qname.IsFullyQualifiedName && qname.IsSimpleName &&
@@ -727,7 +733,8 @@ namespace PHP.Core.Parsers
 
         private void CheckTypeNameInUse(Name typeName, Text.Span span)
         {
-            if (CurrentScopeAliases.ContainsKey(typeName.Value) || reservedTypeNames.Contains(typeName.Value))
+            var aliases = this.CurrentNaming.Aliases;
+            if (reservedTypeNames.Contains(typeName.Value) || (aliases != null && aliases.ContainsKey(typeName.Value)))
                 errors.Add(FatalErrors.ClassAlreadyInUse, SourceUnit, span, CurrentNamespaceName + typeName.Value);
         }
 
@@ -739,6 +746,8 @@ namespace PHP.Core.Parsers
 		private void CheckTypeParameterNames(List<FormalTypeParam> typeParams, string/*!*/declarerName)
 		{
 			if (typeParams == null) return;
+            
+            var aliases = this.CurrentNaming.Aliases;
 
 			for (int i = 0; i < typeParams.Count; i++)
 			{
@@ -746,7 +755,7 @@ namespace PHP.Core.Parsers
 				{
 					ErrorSink.Add(Errors.GenericParameterCollidesWithDeclarer, SourceUnit, typeParams[i].Span, declarerName);
 				}
-                else if (CurrentScopeAliases.ContainsKey(typeParams[i].Name.Value))
+                else if (aliases != null && aliases.ContainsKey(typeParams[i].Name.Value))
                 {
                     ErrorSink.Add(Errors.GenericAlreadyInUse, SourceUnit, typeParams[i].Span, typeParams[i].Name.Value);
                 }
@@ -851,21 +860,30 @@ namespace PHP.Core.Parsers
         /// <summary>
         /// Dictionary of PHP aliases for the current scope.
         /// </summary>
-        private Dictionary<string, QualifiedName>/*!*/ CurrentScopeAliases
+        private NamingContext/*!*/ CurrentNaming
         {
             get
             {
-                return (currentNamespace != null) ? currentNamespace.Aliases : this.sourceUnit.Aliases;
+                return (currentNamespace != null) ? currentNamespace.Naming : this.sourceUnit.Naming;
             }
         }
 
-        /// <summary>
-        /// Add PHP alias (through <c>use</c> keyword).
-        /// </summary>
-        /// <param name="fullQualifiedName">Fully qualified aliased name.</param>
-        private void AddAlias(QualifiedName fullQualifiedName)
+        private void AddAliases(List<KeyValuePair<string, QualifiedName>>/*!*/list)
         {
-            AddAlias(fullQualifiedName, fullQualifiedName.Name.Value);
+            foreach (var pair in list)
+                AddAlias(pair.Value, pair.Key);
+        }
+
+        private void AddFunctionAliases(List<KeyValuePair<string, QualifiedName>>/*!*/list)
+        {
+            foreach (var pair in list)
+                AddFunctionAlias(pair.Value, pair.Key);
+        }
+
+        private void AddConstAliases(List<KeyValuePair<string, QualifiedName>>/*!*/list)
+        {
+            foreach (var pair in list)
+                AddConstAlias(pair.Value, pair.Key);
         }
 
         /// <summary>
@@ -873,15 +891,14 @@ namespace PHP.Core.Parsers
         /// </summary>
         /// <param name="fullQualifiedName">Fully qualified aliased name.</param>
         /// <param name="alias">If not null, represents the alias name. Otherwise the last component from <paramref name="fullQualifiedName"/> is used.</param>
-        private void AddAlias(QualifiedName fullQualifiedName, string/*!*/alias)
+        private void AddAlias(QualifiedName fullQualifiedName, string alias)
         {
             Debug.Assert(!string.IsNullOrEmpty(fullQualifiedName.Name.Value));
-            Debug.Assert(!string.IsNullOrEmpty(alias));
             Debug.Assert(fullQualifiedName.IsFullyQualifiedName);
 
-            //if (sourceUnit.CompilationUnit.IsTransient)   // J: supported, as it is in PHP. Simply within this transient sourceUnit
-            //    throw new NotImplementedException("Adding an alias from within eval is not supported.");
-            
+            //
+            alias = alias ?? fullQualifiedName.Name.Value;
+
             // check if it aliases itself:
             QualifiedName qualifiedAlias = new QualifiedName(
                 new Name(alias),
@@ -890,18 +907,31 @@ namespace PHP.Core.Parsers
             if (fullQualifiedName == qualifiedAlias) return;    // ignore
             
             // add the alias:
+            var naming = this.CurrentNaming;
             
-            // check for alias duplicity:
-            if (!CurrentScopeAliases.ContainsKey(alias) && !reservedTypeNames.Contains(alias))
+            // check for alias duplicity and add the alias:
+            // TODO: check if there is no conflict with some class declaration (this should be in runtime ... but this overriding looks like useful features)
+            if (reservedTypeNames.Contains(alias) || !naming.AddAlias(alias, fullQualifiedName))
             {
-                // TODO: check if there is no conflict with some class declaration (this should be in runtime ... but this overriding looks like useful features)
-
-                // add alias into the scope
-                CurrentScopeAliases.Add(alias, fullQualifiedName);
+                errors.Add(FatalErrors.AliasAlreadyInUse, this.sourceUnit, this.yypos/*TODO: position of the alias itself*/, fullQualifiedName.NamespacePhpName, alias);
             }
-            else
+        }
+
+        private void AddFunctionAlias(QualifiedName qname, string alias)
+        {
+            alias = alias ?? qname.Name.Value;
+            if (!this.CurrentNaming.AddFunctionAlias(alias, qname))
             {
-                errors.Add(FatalErrors.AliasAlreadyInUse, this.sourceUnit, this.yypos, fullQualifiedName.NamespacePhpName, alias);
+                errors.Add(FatalErrors.AliasAlreadyInUse, this.sourceUnit, this.yypos/*TODO: position of the alias itself*/, qname.NamespacePhpName, alias);
+            }
+        }
+
+        private void AddConstAlias(QualifiedName qname, string alias)
+        {
+            alias = alias ?? qname.Name.Value;
+            if (!this.CurrentNaming.AddConstantAlias(alias, qname))
+            {
+                errors.Add(FatalErrors.AliasAlreadyInUse, this.sourceUnit, this.yypos/*TODO: position of the alias itself*/, qname.NamespacePhpName, alias);
             }
         }
 
@@ -989,37 +1019,14 @@ namespace PHP.Core.Parsers
 
             return QualifiedName.TranslateAlias(
                 qname,
-                CurrentScopeAliases,
+                this.CurrentNaming.Aliases,
                 (IsInGlobalNamespace || sourceUnit.HasImportedNamespaces) ? (QualifiedName?)null : currentNamespace.QualifiedName);  // do not use current namespace, if there are imported namespace ... will be resolved later
-        }
-
-        #endregion
-
-        #region PHPDocBlock
-
-        protected object CreatePHPDocBlockStmt(object/*!*/doccomment)
-        {
-            Debug.Assert(doccomment is PHPDocBlock);
-            return new PHPDocStmt(yypos, (PHPDocBlock)doccomment);
-        }
-
-        protected object SetPHPDoc(object obj, object phpdoc)
-        {
-            Debug.Assert(obj is LangElement);
-            if (!object.ReferenceEquals(phpdoc, null))
-            {
-                Debug.Assert(phpdoc is PHPDocBlock);
-                ((LangElement)obj).SetPHPDoc((PHPDocBlock)phpdoc);
-            }
-
-            return obj;
         }
 
         #endregion
 
         #region Helpers
 
-        private static readonly List<Statement> emptyStatementList = new List<Statement>();
         private static readonly List<Tuple<GenericQualifiedName, Text.Span>> emptyGenericQualifiedNamePositionList = new List<Tuple<GenericQualifiedName, Text.Span>>();
 		private static readonly List<FormalParam> emptyFormalParamListIndex = new List<FormalParam>();
 		private static readonly List<ActualParam> emptyActualParamListIndex = new List<ActualParam>();
@@ -1027,8 +1034,7 @@ namespace PHP.Core.Parsers
 		private static readonly List<Item> emptyItemListIndex = new List<Item>();
 		private static readonly List<NamedActualParam> emptyNamedActualParamListIndex = new List<NamedActualParam>();
 		private static readonly List<FormalTypeParam> emptyFormalTypeParamList = new List<FormalTypeParam>();
-		private static readonly List<TypeRef> emptyTypeRefList = new List<TypeRef>();
-
+		
         private static List<T>/*!*/ListAdd<T>(object list, object item)
         {
             Debug.Assert(list is List<T>);
@@ -1075,13 +1081,6 @@ namespace PHP.Core.Parsers
                 }
                 else
                 {
-                    if (list.Count != 0)
-                    {
-                        var last = list.Last();
-                        if (last.GetType() == typeof(PHPDocStmt))
-                            stmt.SetPHPDoc(((PHPDocStmt)last).PHPDoc);
-                    }
-
                     list.Add(stmt);
                 }
             }
@@ -1090,44 +1089,39 @@ namespace PHP.Core.Parsers
             return listObj;
         }
 
-        private static void ListPrepend<T>(object/*!*/list, object/*!*/item)
+        private List<Statement>/*!*/StmtList(Text.Span extentFrom, Text.Span extentTo, object/*!*/listObj)
         {
-            Debug.Assert(list != null);
-            Debug.Assert(item != null);
-            Debug.Assert(item is T);
-                
-            var tlist = (List<T>)list;
-
-            // little hack when prepending simple syntaxed namespace before some statements:
-            
-            // namespace A;  // == {item}
-            // stmt1; stmt2; // <-- add these stamenents into namespace A
-            // namespace B;
-
-            NamespaceDecl nsitem = item as NamespaceDecl;
-            if (nsitem != null && nsitem.IsSimpleSyntax)
-            {
-                Debug.Assert(list is List<Statement>);
-                var slist = (List<Statement>)list;
-
-                // move statements into nsitem namespace:
-                int i = 0;  // find how many Statements from tlist move to nsitem.Statements
-                while (i < slist.Count && !(slist[i] is NamespaceDecl))
-                    ++i;
-
-                if (i > 0)
-                {
-                    nsitem.Statements.AddRange(slist.Take(i));
-                    //nsitem.UpdatePosition(Text.Span.CombinePositions(nsitem.Span, slist[i - 1].Span));
-                    tlist.RemoveRange(0, i);
-                }
-            }
-                
-            // prepend the item:
-            tlist.Insert(0, (T)item);
+            return StmtList(CombinePositions(extentFrom, extentTo), listObj);
         }
 
-		private static List<T>/*!*/NewList<T>(T item)
+        private List<Statement>/*!*/StmtList(Text.Span extent, object/*!*/listObj)
+        {
+            var list = (List<Statement>)listObj;
+            _docList.Merge(extent, list);
+
+            return list;
+        }
+
+        private T AnnotateDoc<T>(T declstmt)
+        {
+            _docList.Annotate((IDeclarationElement)declstmt);
+            return declstmt;
+        }
+
+        private Text.Span Combine(Text.Span first, Text.Span second)
+        {
+            return Text.Span.Combine(first, second);
+        }
+
+        private Text.Span Combine(Text.Span start, Text.Span optEnd1, Text.Span optEnd2, Text.Span end)
+        {
+            if (optEnd1.IsValid) end = optEnd1;
+            else if (optEnd2.IsValid) end = optEnd2;
+
+            return Combine(start, end);
+        }
+
+        private static List<T>/*!*/NewList<T>(T item)
 		{
 			return new List<T>(1){ item };
         }
@@ -1156,6 +1150,8 @@ namespace PHP.Core.Parsers
         /// <returns>Text of the token.</returns>
         private string CSharpNameToken(Text.Span span, string token)
         {
+            // TODO: move to scanner
+            
             // get token string:
             //string token = this.scanner.GetTokenString(position);
 
@@ -1172,6 +1168,211 @@ namespace PHP.Core.Parsers
             return token;
         }
 
+        /// <summary>
+        /// Gets formal parameter flags.
+        /// </summary>
+        /// <param name="byref">Whether the parameter is prefixed with <c>&amp;</c> character.</param>
+        /// <param name="variadic">Whether the parameter is prefixed with <c>...</c>.</param>
+        /// <returns>Parameter flags.</returns>
+        private static FormalParam.Flags FormalParamFlags(bool byref, bool variadic)
+        {
+            FormalParam.Flags flags = FormalParam.Flags.Default;
+
+            if (byref) flags |= FormalParam.Flags.IsByRef;
+            if (variadic) flags |= FormalParam.Flags.IsVariadic;
+
+            return flags;
+        }
+
 		#endregion
+
+        #region Handling PHPDoc: ICommentsSink, IScannerHandler Members
+
+        private ICommentsSink/*!*/_commentSink;
+        private IScannerHandler/*!*/_scannerHandler;
+        private DocCommentList/*!*/_docList;
+
+        private void InitializeCommentSink()
+        {
+            _commentSink = ChainForwardCommentSink.ChainSinks(reductionsSink as ICommentsSink, sourceUnit as ICommentsSink);
+            _scannerHandler = (sourceUnit as IScannerHandler) ?? new Scanner.NullScannerHandler();
+            _docList = new DocCommentList();
+        }
+
+        private void ClearCommentSink()
+        {
+            _commentSink = null;
+            _scannerHandler = null;
+            _docList = null;
+        }
+
+        #region Nested class: ChainCommentsSink
+
+        private abstract class ChainCommentsSink : ICommentsSink
+        {
+            readonly ICommentsSink/*!*/_next;
+
+            protected ChainCommentsSink(ICommentsSink next)
+            {
+                _next = next ?? new Scanner.NullCommentsSink();
+            }
+
+            #region ICommentsSink Members
+
+            public virtual void OnLineComment(Scanner scanner, Text.TextSpan span)
+            {
+                _next.OnLineComment(scanner, span);
+            }
+
+            public virtual void OnComment(Scanner scanner, Text.TextSpan span)
+            {
+                _next.OnComment(scanner, span);
+            }
+
+            public virtual void OnPhpDocComment(Scanner scanner, PHPDocBlock phpDocBlock)
+            {
+                _next.OnPhpDocComment(scanner, phpDocBlock);
+            }
+
+            public virtual void OnOpenTag(Scanner scanner, Text.TextSpan span)
+            {
+                _next.OnOpenTag(scanner, span);
+            }
+
+            public virtual void OnCloseTag(Scanner scanner, Text.TextSpan span)
+            {
+                _next.OnCloseTag(scanner, span);
+            }
+
+            #endregion
+        }
+
+        private sealed class ChainForwardCommentSink : ChainCommentsSink
+        {
+            readonly ICommentsSink/*!*/_forward;
+
+            private ChainForwardCommentSink(ICommentsSink/*!*/forward, ICommentsSink/*!*/next)
+                : base(next)
+            {
+                _forward = forward;
+            }
+
+            public static ICommentsSink/*!*/ChainSinks(ICommentsSink first, ICommentsSink second)
+            {
+                if (first != null)
+                {
+                    if (second != null) return new ChainForwardCommentSink(first, second);
+                    else return first;
+                }
+
+                //
+                return second ?? new Scanner.NullCommentsSink();
+            }
+
+            public override void OnLineComment(Scanner scanner, Text.TextSpan span)
+            {
+                _forward.OnLineComment(scanner, span);
+                base.OnLineComment(scanner, span);
+            }
+
+            public override void OnComment(Scanner scanner, Text.TextSpan span)
+            {
+                _forward.OnComment(scanner, span);
+                base.OnComment(scanner, span);
+            }
+
+            public override void OnPhpDocComment(Scanner scanner, PHPDocBlock phpDocBlock)
+            {
+                _forward.OnPhpDocComment(scanner, phpDocBlock);
+                base.OnPhpDocComment(scanner, phpDocBlock);
+            }
+
+            public override void OnOpenTag(Scanner scanner, Text.TextSpan span)
+            {
+                _forward.OnOpenTag(scanner, span);
+                base.OnOpenTag(scanner, span);
+            }
+
+            public override void OnCloseTag(Scanner scanner, Text.TextSpan span)
+            {
+                _forward.OnCloseTag(scanner, span);
+                base.OnCloseTag(scanner, span);
+            }
+        }
+
+        private sealed class HandleDocComment : IScannerHandler
+        {
+            readonly Parser _parser;
+            readonly IScannerHandler _next;
+            readonly PHPDocBlock _docComment;
+
+            public HandleDocComment(Parser/*!*/parser, PHPDocBlock/*!*/phpDocBlock, IScannerHandler/*!*/next)
+            {
+                Debug.Assert(parser != null);
+                Debug.Assert(phpDocBlock != null);
+                Debug.Assert(next != null);
+
+                _parser = parser;
+                _docComment = phpDocBlock;
+                _next = next;
+            }
+
+            #region IScannerHandler Members
+
+            public void OnNextToken(Tokens token, char[] buffer, int tokenStart, int tokenLength)
+            {
+                if (token != Tokens.T_WHITESPACE)
+                {
+                    // now we know all the whitespace after the DOC comment
+                    _parser._docList.AppendBlock(_docComment, _parser.Scanner.TokenPosition.Start);
+
+                    // remove this handler so it is not called on every IScannerHandler.OnNextToken
+                    Debug.Assert(_parser._scannerHandler == this);
+                    _parser._scannerHandler = _next;
+                }
+
+                _next.OnNextToken(token, buffer, tokenStart, tokenLength);
+            }
+
+            #endregion
+        }
+
+        #endregion
+
+        void ICommentsSink.OnLineComment(Scanner scanner, Text.TextSpan span)
+        {
+            _commentSink.OnLineComment(scanner, span);
+        }
+
+        void ICommentsSink.OnComment(Scanner scanner, Text.TextSpan span)
+        {
+            _commentSink.OnComment(scanner, span);
+        }
+
+        void ICommentsSink.OnPhpDocComment(Scanner scanner, PHPDocBlock phpDocBlock)
+        {
+            // handle the next non-whitespace token so we'll know span of the DOC comment including the following whitespace
+            _scannerHandler = new HandleDocComment(this, phpDocBlock, _scannerHandler);
+
+            //
+            _commentSink.OnPhpDocComment(scanner, phpDocBlock);
+        }
+
+        void ICommentsSink.OnOpenTag(Scanner scanner, Text.TextSpan span)
+        {
+            _commentSink.OnOpenTag(scanner, span);
+        }
+
+        void ICommentsSink.OnCloseTag(Scanner scanner, Text.TextSpan span)
+        {
+            _commentSink.OnCloseTag(scanner, span);
+        }
+
+        void IScannerHandler.OnNextToken(Tokens token, char[] buffer, int tokenStart, int tokenLength)
+        {
+            _scannerHandler.OnNextToken(token, buffer, tokenStart, tokenLength);
+        }
+
+        #endregion
 	}
 }

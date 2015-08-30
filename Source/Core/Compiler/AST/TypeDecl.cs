@@ -576,7 +576,7 @@ namespace PHP.Core.Compiler.AST
 
                     // TODO: instead of embedding class source code,
                     // embedd serialized AST, so avoid parsing again in runtime
-                    this.typeDefinitionCode = analyzer.SourceUnit.GetSourceCode(node.EntireDeclarationPosition);
+                    this.typeDefinitionCode = analyzer.SourceUnit.GetSourceCode(node.EntireDeclarationSpan);
                     
                     // we emit eval
                     return node;
@@ -635,11 +635,12 @@ namespace PHP.Core.Compiler.AST
                     codeGenerator.EnterLambdaDeclaration(il, false, LiteralPlace.Null, new IndexedPlace(PlaceHolder.Argument, 0), LiteralPlace.Null, LiteralPlace.Null);
                     if (true)
                     {
+                        var naming  = (node.Namespace != null) ? node.Namespace.Naming : node.SourceUnit.Naming;  // current naming context aliases
                         codeGenerator.EmitEval(
                             EvalKinds.SyntheticEval,
                             LiteralUtils.Create(node.Span, this.typeDefinitionCode, AccessType.Read),
                             node.Span,
-                            (node.Namespace != null) ? node.Namespace.QualifiedName : (QualifiedName?)null, node.validAliases);
+                            (node.Namespace != null) ? node.Namespace.QualifiedName : (QualifiedName?)null, naming.Aliases);
                         il.Emit(OpCodes.Pop);
                         il.Emit(OpCodes.Ret);
                     }
@@ -1147,7 +1148,7 @@ namespace PHP.Core.Compiler.AST
                     codeGenerator.EnterMethodDeclaration(method);
 
                     // emits the arg-full overload:
-                    codeGenerator.EmitArgfullOverloadBody(method, node.Body, node.EntireDeclarationPosition, node.DeclarationBodyPosition);
+                    codeGenerator.EmitArgfullOverloadBody(method, node.Body, node.EntireDeclarationSpan, node.DeclarationBodyPosition);
 
                     // restores original code generator settings:
                     codeGenerator.LeaveMethodDeclaration();

@@ -21,6 +21,7 @@ using System.Diagnostics.SymbolStore;
 
 using PHP.Core;
 using PHP.Core.Parsers;
+using PHP.Core.Text;
 
 namespace PHP.Core.AST
 {
@@ -35,7 +36,7 @@ namespace PHP.Core.AST
     /// class. The sample code below illustrates a part of PHP global code
     /// </remarks>
     [Serializable]
-    public sealed class GlobalCode : AstNode, IHasSourceUnit
+    public sealed class GlobalCode : AstNode, IHasSourceUnit, IDeclarationElement
     {
         /// <summary>
         /// Array of nodes representing statements in PHP global code
@@ -48,6 +49,8 @@ namespace PHP.Core.AST
         /// </summary>
         public SourceUnit/*!*/ SourceUnit { get { return sourceUnit; } }
         private readonly SourceUnit/*!*/ sourceUnit;
+
+        public Span EntireDeclarationSpan { get { return new Text.Span(0, sourceUnit.LineBreaks.TextLength); } }
 
         #region Constructors
 
@@ -88,7 +91,7 @@ namespace PHP.Core.AST
     #region NamespaceDecl
 
     [Serializable]
-    public sealed class NamespaceDecl : Statement
+    public sealed class NamespaceDecl : Statement, IDeclarationElement
     {
         internal override bool IsDeclaration { get { return true; } }
 
@@ -97,22 +100,24 @@ namespace PHP.Core.AST
         /// </summary>
         public readonly bool IsSimpleSyntax;
 
-        public QualifiedName QualifiedName { get { return qualifiedName; } }
+        public QualifiedName QualifiedName { get { return this.qualifiedName; } }
         private QualifiedName qualifiedName;
 
-        /// <summary>
-        /// Dictionary of PHP aliases.
-        /// </summary>
-        public Dictionary<string, QualifiedName>/*!*/ Aliases { get { return aliases; } }
-        private readonly Dictionary<string, QualifiedName>/*!*/ aliases = new Dictionary<string, QualifiedName>(StringComparer.OrdinalIgnoreCase);
+        public Span EntireDeclarationSpan { get { return this.Span; } }
 
-        public bool IsAnonymous { get { return isAnonymous; } }
+        /// <summary>
+        /// Naming context defining aliases.
+        /// </summary>
+        public NamingContext/*!*/ Naming { get { return this.naming; } }
+        private readonly NamingContext naming;
+
+        public bool IsAnonymous { get { return this.isAnonymous; } }
         private readonly bool isAnonymous;
 
         public List<Statement>/*!*/ Statements
         {
-            get { return statements; }
-            internal /* friend Parser */ set { statements = value; }
+            get { return this.statements; }
+            internal /* friend Parser */ set { this.statements = value; }
         }
         private List<Statement>/*!*/ statements;
 
@@ -124,6 +129,7 @@ namespace PHP.Core.AST
             this.isAnonymous = true;
             this.qualifiedName = new QualifiedName(Core.Name.EmptyBaseName, Core.Name.EmptyNames);
             this.IsSimpleSyntax = false;
+            this.naming = new NamingContext(null, null);
         }
 
         public NamespaceDecl(Text.Span p, List<string>/*!*/ names, bool simpleSyntax)
@@ -132,6 +138,7 @@ namespace PHP.Core.AST
             this.isAnonymous = false;
             this.qualifiedName = new QualifiedName(names, false, true);
             this.IsSimpleSyntax = simpleSyntax;
+            this.naming = new NamingContext(this.qualifiedName, null);
         }
 
         /// <summary>
@@ -169,7 +176,7 @@ namespace PHP.Core.AST
     #region GlobalConstDeclList, GlobalConstantDecl
 
     [Serializable]
-    public sealed class GlobalConstDeclList : Statement
+    public sealed class GlobalConstDeclList : Statement, IDeclarationElement
     {
         /// <summary>
         /// Gets collection of CLR attributes annotating this statement.
@@ -182,7 +189,12 @@ namespace PHP.Core.AST
 
         public List<GlobalConstantDecl>/*!*/ Constants { get { return constants; } }
         private readonly List<GlobalConstantDecl>/*!*/ constants;
-        
+
+        public Text.Span EntireDeclarationSpan
+        {
+            get { return this.Span; }
+        }
+
         public GlobalConstDeclList(Text.Span span, List<GlobalConstantDecl>/*!*/ constants, List<CustomAttribute> attributes)
             : base(span)
         {

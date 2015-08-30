@@ -294,9 +294,9 @@ namespace PHP.Core.AST
         /// Visit all statements in the given list.
         /// </summary>
         /// <param name="statements">Collection of statements to visit.</param>
-        private void VisitStatements(ICollection<Statement> statements)
+        private void VisitStatements(IList<Statement> statements)
         {
-            if (statements != null && statements.Any())
+            if (statements != null)
                 foreach (Statement s in statements)
                     VisitElement(s);
         }
@@ -449,6 +449,10 @@ namespace PHP.Core.AST
         {
             VisitElement(x.TypeRef);
             VisitConstantUse(x);
+        }
+        virtual public void VisitPseudoClassConstUse(PseudoClassConstUse x)
+        {
+            VisitClassConstUse(x);
         }
         virtual public void VisitPseudoConstUse(PseudoConstUse x)
         {
@@ -818,8 +822,8 @@ namespace PHP.Core.AST
         /// <param name="x"></param>
         virtual public void VisitCatchItem(CatchItem x)
         {
+            VisitElement(x.TypeRef);
             VisitElement(x.Variable);
-
             VisitStatements(x.Statements);
         }
 

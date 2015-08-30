@@ -376,6 +376,12 @@ namespace PHP.Core
         private List<PhpReference> staticLocals;
 
         /// <summary>
+        /// Gets collection of script context properties used to store custom objects. Cannot be <c>null</c>.
+        /// </summary>
+        public PropertyCollectionClass/*!*/Properties { get { return this.properties; } }
+        private readonly PropertyCollectionClass/*!*/properties = new PropertyCollectionClass();
+
+        /// <summary>
         /// The stack for performing indirect calls and calls to argument-aware functions.
         /// </summary>
         public readonly PhpStack Stack;
@@ -410,7 +416,7 @@ namespace PHP.Core
         private Stack<DTypeDesc> _currentLateStaticBinding;
 
         /// <summary>
-        /// Get the value indicating if SPL autload functions are enabled. (If spl_autoload_register was used.)
+        /// Get the value indicating if SPL autoload functions are enabled. (If spl_autoload_register was used.)
         /// </summary>
         public bool IsSplAutoloadEnabled { get { return splAutoloadFunctions != null; } }
 

@@ -27,10 +27,13 @@ namespace PHP.Core.AST
     /// Represents a function declaration.
     /// </summary>
     [Serializable]
-    public sealed class LambdaFunctionExpr : Expression, IHasSourceUnit
+    public sealed class LambdaFunctionExpr : Expression, IHasSourceUnit, IDeclarationElement
     {
-        //public NamespaceDecl Namespace { get { return ns; } }
-        //private readonly NamespaceDecl ns
+        /// <summary>
+        /// Gets namespace containing this lambda expression. Can be <c>null</c>.
+        /// </summary>
+        public NamespaceDecl Namespace { get { return ns; } }
+        private readonly NamespaceDecl ns;
 
         public override Operations Operation
         {
@@ -60,8 +63,8 @@ namespace PHP.Core.AST
         private readonly Statement[]/*!*/ body;
         //private readonly CustomAttributes attributes;
 
-        public Text.Span EntireDeclarationPosition { get { return entireDeclarationPosition; } }
-        private readonly Text.Span entireDeclarationPosition;
+        public Text.Span EntireDeclarationSpan { get { return entireDeclarationSpan; } }
+        private readonly Text.Span entireDeclarationSpan;
 
         public int HeadingEndPosition { get { return headingEndPosition; } }
         private readonly int headingEndPosition;
@@ -89,13 +92,13 @@ namespace PHP.Core.AST
 
             this.sourceUnit = sourceUnit;
             
-            //this.ns = ns;
+            this.ns = ns;
             this.signature = new Signature(aliasReturn, formalParams);
             this.useParams = useParams;
             //this.typeSignature = new TypeSignature(genericParams);
             //this.attributes = new CustomAttributes(attributes);
             this.body = body.AsArray();
-            this.entireDeclarationPosition = entireDeclarationPosition;
+            this.entireDeclarationSpan = entireDeclarationPosition;
             this.headingEndPosition = headingEndPosition;
             this.declarationBodyPosition = declarationBodyPosition;
         }
