@@ -339,8 +339,8 @@ namespace PHP.Library
 			/// </summary>
 			private static void Clear()
 			{
-				_current = null;
-			}
+                ThreadStatic.Properties.SetProperty<Handlers>(null);
+            }
 
 			/// <summary>
 			/// Registeres <see cref="Clear"/> called on request end.
@@ -357,12 +357,13 @@ namespace PHP.Library
 			{
 				get
 				{
-					if (_current == null) _current = new Handlers();
-					return _current;
+                    Handlers info;
+                    var properties = ThreadStatic.Properties;
+                    if (properties.TryGetProperty<Handlers>(out info) == false || info == null)
+                        properties.SetProperty<Handlers>(info = new Handlers());
+					return info;
 				}
 			}
-			[ThreadStatic]
-			private static Handlers _current = null;
 		}
 
 		#endregion

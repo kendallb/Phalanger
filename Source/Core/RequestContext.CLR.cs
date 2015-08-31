@@ -41,17 +41,29 @@ namespace PHP.Core
 				DebugUtils.WebInitialize();
 		}
 
-		/// <summary>
-		/// The request context associated with the current thread executing the request. 
-		/// Set by <see cref="Initialize"/> method when the request starts.
-		/// Contains a <B>null</B> reference when the current thread is not executing any web request 
-		/// (or prior to the call to <see cref="Initialize"/> method).
-		/// </summary>
-		public static RequestContext CurrentContext { get { return currentContext; } }
-		[ThreadStatic]
-		private static RequestContext currentContext = null;
+	    private const string CurrentContextKey = "PhpNet:RequestContext.Current";
 
-		private RequestContext(HttpContext/*!*/ httpContext)
+	    /// <summary>
+	    /// The request context associated with the current thread executing the request. 
+	    /// Set by <see cref="Initialize"/> method when the request starts.
+	    /// Contains a <B>null</B> reference when the current thread is not executing any web request 
+	    /// (or prior to the call to <see cref="Initialize"/> method).
+	    /// </summary>
+	    public static RequestContext CurrentContext
+	    {
+	        get
+	        {
+	            Debug.Assert(HttpContext.Current != null);
+                return (RequestContext)HttpContext.Current.Items[CurrentContextKey];
+	        }
+	        set
+	        {
+                Debug.Assert(HttpContext.Current != null);
+                HttpContext.Current.Items[CurrentContextKey] = value;
+            }
+	    }
+
+	    private RequestContext(HttpContext/*!*/ httpContext)
 		{
 			this.httpContext = httpContext;
 			this.connectionAborted = false;
@@ -161,7 +173,7 @@ namespace PHP.Core
 			if (context == null)
 				throw new ArgumentNullException("context");
 
-			RequestContext req_context = currentContext;
+			RequestContext req_context = CurrentContext;
 
 			// already initialized within the current request:
 			if (req_context != null && req_context.httpContext.Timestamp == context.Timestamp)
@@ -170,7 +182,7 @@ namespace PHP.Core
 			Debug.WriteLine("REQUEST", "-- started ----------------------");
 
 			req_context = new RequestContext(context);
-			currentContext = req_context;
+			CurrentContext = req_context;
 
 			req_context.Initialize(appContext);
 
@@ -202,7 +214,7 @@ namespace PHP.Core
 		/// </summary>
 		public static void FinalizeContext()
 		{
-			RequestContext req_context = currentContext;
+			RequestContext req_context = CurrentContext;
 			if (req_context != null) req_context.Dispose();
 		}
 
@@ -644,7 +656,7 @@ namespace PHP.Core
 			UpdateSessionCookieExpiration();
 
             this.httpContext = null;
-            currentContext = null;
+            CurrentContext = null;
         }
 
 		#endregion
