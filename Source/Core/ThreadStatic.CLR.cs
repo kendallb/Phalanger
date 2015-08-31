@@ -29,10 +29,10 @@ namespace PHP.Core
         /// <summary>
         /// Thread local properties collection
         /// </summary>
-        //[DebuggerNonUserCode]
+        [DebuggerNonUserCode]
         public static PropertyCollectionClass /*!*/ Properties
         {
-            //[Emitted]
+            [Emitted]
             get
             {
                 try
