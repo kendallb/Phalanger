@@ -41,8 +41,6 @@ namespace PHP.Core
 				DebugUtils.WebInitialize();
 		}
 
-	    private const string CurrentContextKey = "PhpNet:RequestContext.Current";
-
 	    /// <summary>
 	    /// The request context associated with the current thread executing the request. 
 	    /// Set by <see cref="Initialize"/> method when the request starts.
@@ -51,15 +49,15 @@ namespace PHP.Core
 	    /// </summary>
 	    public static RequestContext CurrentContext
 	    {
-	        get
-	        {
-	            Debug.Assert(HttpContext.Current != null);
-                return (RequestContext)HttpContext.Current.Items[CurrentContextKey];
-	        }
-	        set
-	        {
-                Debug.Assert(HttpContext.Current != null);
-                HttpContext.Current.Items[CurrentContextKey] = value;
+            get
+            {
+                RequestContext info;
+                ThreadStatic.Properties.TryGetProperty<RequestContext>(out info);
+                return info;
+            }
+            set
+            {
+                ThreadStatic.Properties.SetProperty<RequestContext>(value);
             }
 	    }
 
