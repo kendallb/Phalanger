@@ -256,7 +256,7 @@ namespace PHP.Library
 		[ImplementsFunction("rand")]
 		public static int Random(int min, int max)
 		{
-			return (min < max) ? Generator.Next(min, max) : Generator.Next(max, min);
+			return (min < max) ? Generator.Next(min, max + 1) : Generator.Next(max, min + 1);
 		}
 
         /// <summary>
