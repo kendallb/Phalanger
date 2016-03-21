@@ -2932,6 +2932,9 @@ namespace PHP.Core
                     if (this.MainScriptInfo != null)
                         this.MainScriptInfo.SaveMaxCounts(this);
 
+                    // clear context data
+                    this.Properties.ClearProperties();
+
                     //
                     this.disposed = true;
                 }

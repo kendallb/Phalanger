@@ -67,7 +67,7 @@ namespace PHP.Library
 			{
 			    var info = StaticInfo.Get;
                 if (info.Generator == null)
-					info.Generator = new Random(unchecked((int)System.DateTime.Now.ToFileTime()));
+					info.Generator = new Random(unchecked((int)System.DateTime.UtcNow.ToFileTime()));
                 return info.Generator;
 			}
 		}
@@ -81,7 +81,7 @@ namespace PHP.Library
 			{
                 var info = StaticInfo.Get;
                 if (info.MtGenerator == null)
-                    info.MtGenerator = new MersenneTwister(unchecked((uint)System.DateTime.Now.ToFileTime()));
+                    info.MtGenerator = new MersenneTwister(unchecked((uint)System.DateTime.UtcNow.ToFileTime()));
                 return info.MtGenerator;
 			}
 		}
@@ -101,9 +101,7 @@ namespace PHP.Library
 		{
 		    var info = StaticInfo.Get;
             info.Generator = null;
-
-            if (info.MtGenerator != null)
-                info.MtGenerator.Seed(unchecked((uint)System.DateTime.Now.ToFileTime()));
+            info.MtGenerator = null;
 		}
 
 		#endregion
@@ -209,6 +207,14 @@ namespace PHP.Library
 		#region rand, srand, getrandmax, uniqid, lcg_value
 
         /// <summary>
+        /// Gets <c>0</c> or <c>1</c> randomly.
+        /// </summary>
+        static int Random01()
+        {
+            return (int)Math.Round(Generator.NextDouble());
+        }
+
+        /// <summary>
         /// Seed the random number generator. No return value.
         /// </summary>
         [ImplementsFunction("srand")]
@@ -244,7 +250,7 @@ namespace PHP.Library
 		[ImplementsFunction("rand")]
 		public static int Random()
 		{
-			return Generator.Next();
+            return Generator.Next() + Random01();
 		}
 
         /// <summary>
@@ -256,7 +262,16 @@ namespace PHP.Library
 		[ImplementsFunction("rand")]
 		public static int Random(int min, int max)
 		{
-			return (min < max) ? Generator.Next(min, max + 1) : Generator.Next(max, min + 1);
+            if (min > max)
+                return Random(max, min);
+
+            if (min == max)
+                return min;
+
+            if (max == int.MaxValue)
+                return Generator.Next(min, int.MaxValue) + Random01();
+            
+            return Generator.Next(min, max + 1);
 		}
 
         /// <summary>
