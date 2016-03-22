@@ -2652,6 +2652,9 @@ namespace PHP.Core.Reflection
     {
         #region Fields and Properties
 
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        private static readonly WeakCache<ClrObject>/*!*/ cache = new WeakCache<ClrObject>();
+
         /// <summary>
         /// The real object contained by this ClrObject wrapper.
         /// </summary>
@@ -2675,6 +2678,18 @@ namespace PHP.Core.Reflection
             this.realObject = obj;
         }
 
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        protected override bool ReadyForDisposal
+        {
+            get
+            {
+                lock (cache)
+                {
+                    return !cache.ContainsKey(realObject);
+                }
+            }
+        }
+
         #endregion
 
         #region Construction and Finalization
@@ -2691,6 +2706,26 @@ namespace PHP.Core.Reflection
         {
             Debug.Assert(realObject != null);
             this.realObject = realObject;
+        }
+
+        ~ClrObject()
+        {
+            // if the real object is still held in the cache, resurrect this instance
+            lock (cache)
+            {
+                try
+                {
+                    if (cache.ContainsKey(realObject))
+                    {
+                        //cache.Resurrect(realObject, this);
+                        GC.ReRegisterForFinalize(this);
+                    }
+                }
+                catch (System.Runtime.Remoting.RemotingException)
+                {
+                    // do not ressurect dead remote objects
+                }
+            }
         }
 
         /// <summary>
@@ -2735,7 +2770,16 @@ namespace PHP.Core.Reflection
             Debug.Assert(!PhpVariable.HasPrimitiveType(instance));
             Debug.Assert(!(instance is DObject));
 
-            return Create(instance);
+            ClrObject result;
+
+            lock (cache)
+            {
+                if (!cache.TryGetValue(instance, out result))
+                {
+                    return Create(instance);
+                }
+            }
+            return result;
         }
 
         #region MulticastDelegate wrapping
@@ -2863,7 +2907,14 @@ namespace PHP.Core.Reflection
             if (type.IsValueType) // wrapped boxed value types are not cached
                 return (DObject)valueTypesCache.Get(type).Item2.DynamicInvoke(realObject);
             
-            return new ClrObject(realObject);
+            ClrObject result = new ClrObject(realObject);
+
+            lock (cache)
+            {
+                // realObject is a fresh new object which is surely not in the cache
+                cache.Add(realObject, result);
+            }
+            return result;
         }
 
         #endregion
@@ -2901,6 +2952,13 @@ namespace PHP.Core.Reflection
         {
             return realObject.ToString();
         }
+
+#if DEBUG
+        public static int GetCacheSize()
+        {
+            return cache.Count;
+        }
+#endif
 
         #endregion
 
