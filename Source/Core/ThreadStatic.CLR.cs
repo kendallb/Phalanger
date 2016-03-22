@@ -1,6 +1,6 @@
 /*
 
- Copyright (c) 2015 Kendall Bennett
+ Copyright (c) 2015-2016 Kendall Bennett
   
  The use and distribution terms for this software are contained in the file named License.txt, 
  which can be found in the root of the Phalanger distribution. By using this software 
@@ -13,6 +13,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.Remoting.Messaging;
+using System.Web;
 
 namespace PHP.Core
 {
@@ -21,10 +22,17 @@ namespace PHP.Core
     /// </summary>
     public static class ThreadStatic
     {
-        /// <summary>
-        /// Call context name for the current <see cref="ScriptContext"/>.
-        /// </summary>
-        private const string callContextSlotName = "PhpNet:ThreadStatic";
+        private const string httpContextItemsName = "PhpNet:RequestStatic";
+
+        // Thread static variable to store the value for non-web code. We do not want to use call context
+        // names slots, because stupid .net will *clone* those over for async I/O operations and you will end up
+        // with a memory leak as lots of I/O competion handles will end up with copies of our properties collection.
+        // Not good. So for web apps we use HttpContext.Current.Items and for console apps we use thread static.
+#if !SILVERLIGHT
+        // TODO: Silverlight does not support ThreadStatic, so just use regular static variables for now
+        [ThreadStatic]
+#endif
+        private static PropertyCollectionClass threadStatic;
 
         /// <summary>
         /// Thread local properties collection
@@ -37,28 +45,43 @@ namespace PHP.Core
             {
                 try
                 {
-                    var properties = ((PropertyCollectionClass) CallContext.GetData(callContextSlotName));
-                    if (properties == null)
+                    var httpContext = HttpContext.Current;
+                    if (httpContext != null)
                     {
-                        properties = new PropertyCollectionClass();
-                        CallContext.SetData(callContextSlotName, properties);
+                        // The only safe way to do request local variables in ASP.NET is to put them into the 
+                        // HttpContext.Current.Items dictionary.
+                        var items = httpContext.Items;
+                        var properties = (PropertyCollectionClass) items[httpContextItemsName];
+                        if (properties == null)
+                        {
+                            properties = new PropertyCollectionClass();
+                            items[httpContextItemsName] = properties;
+                        }
+                        return properties;
                     }
-                    return properties;
+                    else
+                    {
+                        // For console apps, use the thread static storage to keep it thread local
+                        var properties = threadStatic;
+                        if (properties == null) {
+                            threadStatic = properties = new PropertyCollectionClass();
+                        }
+                        return properties;
+                    }
                 }
                 catch (InvalidCastException)
                 {
-                    throw new InvalidCallContextDataException(callContextSlotName);
+                    throw new InvalidCallContextDataException(httpContextItemsName);
                 }
             }
             set
             {
-                if (value == null)
-                    CallContext.FreeNamedDataSlot(callContextSlotName);
+                var httpContext = HttpContext.Current;
+                if (httpContext != null)
+                    httpContext.Items[httpContextItemsName] = value;
                 else
-                    CallContext.SetData(callContextSlotName, value);
+                    threadStatic = value;
             }
-
-            // TODO! Make sure this gets cleared when the script context goes away ...
         }
     }
 }

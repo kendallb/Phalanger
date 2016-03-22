@@ -47,7 +47,8 @@ namespace PHP.Core
 	    /// Contains a <B>null</B> reference when the current thread is not executing any web request 
 	    /// (or prior to the call to <see cref="Initialize"/> method).
 	    /// </summary>
-	    public static RequestContext CurrentContext
+        [DebuggerNonUserCode]
+        public static RequestContext CurrentContext
 	    {
             get
             {
