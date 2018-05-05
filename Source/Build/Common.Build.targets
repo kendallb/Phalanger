@@ -16,13 +16,6 @@
 cd "$(RootDir)"
 "$(ToolsDir)UpdateFileVersionFromChangeset.cmd" "$(MSBuildThisFileDirectory)AssemblyInfoCommon.cs"
 	</PreBuildEvent>
-    <PostBuildEvent>
-if [$(TargetExt)]==[.dll] if [$(SignAssembly)]==[true] (
-   echo Installing $(TargetName) into GAC ...
-   "$(ToolsDir)gacutil" /u $(TargetName) 1&gt;nul
-   "$(ToolsDir)gacutil" /f /i "$(TargetPath)" 1&gt;nul
-)
-    </PostBuildEvent>
   </PropertyGroup>
   
 </Project>
